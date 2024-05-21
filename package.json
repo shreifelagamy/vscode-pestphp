@@ -1,5 +1,5 @@
 {
-    "name": "pest-testing-framework",
+    "name": "pestphp-framework",
     "displayName": "Pest testing framework",
     "description": "Enable the support for the pest testing framework ",
     "version": "0.0.1",
@@ -16,12 +16,6 @@
     ],
     "main": "./dist/extension.js",
     "contributes": {
-        "commands": [
-            {
-                "command": "pest-testing-framework.helloWorld",
-                "title": "Hello World"
-            }
-        ]
     },
     "scripts": {
         "vscode:prepublish": "yarn run package",

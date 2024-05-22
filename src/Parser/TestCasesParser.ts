@@ -1,4 +1,4 @@
-import { Engine, ExpressionStatement } from 'php-parser';
+import { Call, Engine, ExpressionStatement, Node, Program } from 'php-parser';
 import * as vscode from 'vscode';
 import { ItemType, testData } from '../utils';
 
@@ -7,7 +7,11 @@ export default class TestCasesParser {
     }
 
     async discover(test: vscode.TestItem) {
-        const uri = vscode.Uri.file(test?.uri?.path)
+        if (test.uri == undefined) {
+            return;
+        }
+
+        const uri = vscode.Uri.file(test.uri?.path)
         const rawContent = await vscode.workspace.fs.readFile(uri);
         const content = new TextDecoder().decode(rawContent);
         const parser = new Engine({
@@ -21,27 +25,42 @@ export default class TestCasesParser {
             },
         });
 
-        const ast: Program = await parser.parseCode(content);
+        const ast: Program = await parser.parseCode(content, test.label);
 
-        ast.children.filter(child => {
-            return child.kind == 'expressionstatement'
-        }).filter((child: ExpressionStatement) => {
-            return child.expression.what.name && (child.expression.what.name == 'test' || child.expression.what.name == 'it');
-        }).forEach((child: ExpressionStatement) => {
-            const key = child.expression.arguments[0].value;
-            const value = child.expression.arguments[0].value;
+        const childern: Array<Node> = ast.children;
+        let expressions: ExpressionStatement[] = [];
+
+        await childern.forEach((child: Node) => {
+            if (child.kind == 'expressionstatement') {
+                expressions.push(child as ExpressionStatement);
+            }
+        })
+
+        let testCases: ExpressionStatement[] = [];
+        await expressions.forEach(child => {
+            const exp = child.expression as Call
+            if (exp.what.name && (exp.what.name == 'test' || exp.what.name == 'it')) [
+                testCases.push(child)
+            ]
+        })
+
+        testCases.forEach(child => {
+            const expression: any = child.expression
+            const arg: any = expression.arguments[0];
+            const key = arg.value;
+            const value = arg.value;
 
             const testItemId = test.id + '::' + key.replace(/ /g, '_').replace(/-/g, '_');
+            console.log(testItemId)
             const childTestItem = this.controller.createTestItem(testItemId, key, uri);
 
-            if (child.expression.loc) {
-                const startLoc = new vscode.Position(child.expression.loc.start.line - 1, child.expression.loc.start.column);
-                const endLoc = new vscode.Position(child.expression.loc.end.line, child.expression.loc.end.column);
+            if (expression.loc) {
+                const startLoc = new vscode.Position(expression.loc.start.line - 1, expression.loc.start.column);
+                const endLoc = new vscode.Position(expression.loc.end.line, expression.loc.end.column);
 
                 // TODO: enhance test key to include class name
                 childTestItem.range = new vscode.Range(startLoc, endLoc);
             }
-
 
             test.children.add(childTestItem);
             testData.set(childTestItem, ItemType.TestCase);

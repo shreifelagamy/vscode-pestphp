@@ -1,15 +1,15 @@
 'use strict';
 import * as vscode from 'vscode';
-import ParentParser from './Parser/ParentParser';
-import TestCasesParser from './Parser/TestCasesParser';
+import ParentParser from './Controllers/ParentParser';
+import TestCasesParser from './Controllers/TestCasesParser';
+import TestRunner from './Controllers/TestRunner';
 
 // TODO: get composer to check if pest is downloaded
-
-
 export function activate(context: vscode.ExtensionContext) {
     const controller = vscode.tests.createTestController('PestPHPController', 'Pest PHP');
     const parentParser = new ParentParser(controller);
     const testCasesParser = new TestCasesParser(controller);
+    const runner = new TestRunner(controller);
     // TODO: add it to the subscriptions context
     // context.subscriptions.push(controller);
 
@@ -22,22 +22,21 @@ export function activate(context: vscode.ExtensionContext) {
         // controller.items.replace(testsuites);
     }
 
-    controller.refreshHandler = async test => {
-        console.log('refresh', test)
-    }
+    const runProfile = controller.createRunProfile(
+        'Run',
+        vscode.TestRunProfileKind.Run,
+        (request, token) => {
+            runner.run(false, request, token);
+        }
+    );
 
-    // const runProfile = controller.createRunProfile(
-    //     'Run',
-    //     vscode.TestRunProfileKind.Run,
-    //     (request, token) => {
-    //         runHandler(false, request, token, controller);
-    //     }
-    // );
+    // controller.refreshHandler = async test => {
+    //     console.log('refresh', test)
+    // }
+
 
     // async function runHandler(
-    //     shouldDebug: boolean,
-    //     request: vscode.TestRunRequest,
-    //     token: vscode.CancellationToken,
+    //
     //     controller: vscode.TestController
     // ) {
     //     const run = controller.createTestRun(request)

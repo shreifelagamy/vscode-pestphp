@@ -1,6 +1,6 @@
 import * as cp from 'child_process';
 import * as vscode from 'vscode';
-import { ItemType, testData } from '../utils';
+import { Info, ItemType, testData } from '../utils';
 
 export default class ParentParser {
     constructor(private controller: vscode.TestController) {
@@ -28,13 +28,19 @@ export default class ParentParser {
             const theClassName = className.split('::')[0];
 
             if (!classNames.includes(theClassName)) {
-                const testPath = theClassName.replaceAll('\\', '/');
+                const testPath = theClassName.replaceAll('\\', '/').replace('Tests/', 'tests/');
                 const fileUrl = `${workspaceFolder.uri.path}/${testPath}.php`;
                 const uri = vscode.Uri.file(fileUrl)
                 const ParentTestItem = this.controller.createTestItem(theClassName, theClassName, uri);
                 ParentTestItem.canResolveChildren = true;
 
-                testData.set(ParentTestItem, ItemType.File);
+                let info: Info = {
+                    workspaceFolder: workspaceFolder,
+                    caseType: ItemType.File,
+                    parentPath: undefined
+                }
+
+                testData.set(ParentTestItem, info);
                 this.controller.items.add(ParentTestItem);
             }
         });

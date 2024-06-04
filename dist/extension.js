@@ -289,7 +289,7 @@ class TestCasesParser {
         testCases.forEach(child => {
             const expression = child.expression;
             const arg = expression.arguments[0];
-            const key = arg.value;
+            const key = expression.what.name == 'it' ? `it ${arg.value}` : arg.value;
             const value = arg.value;
             const testItemId = test.id + '::' + key.replace(/ /g, '_').replace(/-/g, '_');
             const childTestItem = this.controller.createTestItem(testItemId, key, uri);
@@ -12802,42 +12802,112 @@ var __importStar = (this && this.__importStar) || function (mod) {
     __setModuleDefault(result, mod);
     return result;
 };
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 const child_process_1 = __webpack_require__(3);
 const vscode = __importStar(__webpack_require__(1));
 const utils_1 = __webpack_require__(4);
+const TestCasesParser_1 = __importDefault(__webpack_require__(5));
 class TestRunner {
     controller;
     constructor(controller) {
         this.controller = controller;
     }
-    executeTestCommand(parentPath, testName, testInfo) {
-        return new Promise((resolve, reject) => {
-            const ls = (0, child_process_1.spawn)('vendor/bin/pest', [parentPath, '--teamcity', '--stderr', '--filter', testName], { cwd: testInfo.workspaceFolder?.uri.path });
-            let errMsg = '';
-            let outMsg = '';
-            ls.on('exit', (code, signal) => {
-                if (code !== 0) {
-                    reject({ errMsg, outMsg });
+    runTestCase(testCase, parentPath, testInfo, runner, test) {
+        runner.started(test);
+        const command = (0, child_process_1.spawn)('vendor/bin/pest', [parentPath, '--teamcity', '--stderr', '--filter', testCase], { cwd: testInfo.workspaceFolder?.uri.path });
+        let isFailed = false;
+        let hasException = false;
+        let errorMsg = '';
+        let testSuite = '';
+        command.on('exit', (code, signal) => {
+            if (isFailed) {
+                runner.appendOutput(`❌ ${testCase}${utils_1.EOL}`);
+                if (hasException) {
+                    runner.errored(test, new vscode.TestMessage(errorMsg));
                 }
-                resolve(outMsg);
-            });
-            ls.stdout.on('data', (data) => {
-                const output = data.toString();
-                const regex = /##teamcity\[testFailed .*? message='([^']*)'/;
-                const match = output.match(regex);
-                if (output.includes('Tests:') || output.includes('Duration')) {
-                    outMsg += output.trim().replaceAll('\r\n', '').replaceAll('\n', '') + utils_1.EOL;
+                else {
+                    runner.failed(test, new vscode.TestMessage(errorMsg));
                 }
-                if (match) {
-                    errMsg = match[1];
-                }
-            });
+            }
+            else {
+                runner.appendOutput(`✅ ${testCase}${utils_1.EOL}`);
+                runner.passed(test);
+            }
+            runner.end();
+        });
+        command.stdout.on('data', (data) => {
+            const output = data.toString().trim().split(/\r\n|\n/).join(utils_1.EOL);
+            const testSuiteRegex = /##teamcity\[testSuiteStarted name='([^']*)'/;
+            const regex = /##teamcity\[testFailed .*? message='([^']*)'/;
+            const match = output.match(regex);
+            const testSuiteMatch = output.match(testSuiteRegex);
+            if (testSuiteMatch?.length) {
+                runner.appendOutput(`🚀 \u001b[32m${testSuiteMatch[1]}\u001b[33m '${testCase}'\u001b[0m ${utils_1.EOL}`);
+            }
+            if (match?.length) {
+                isFailed = true;
+                hasException = match[1].includes('Exception');
+                errorMsg = match[1];
+            }
         });
     }
-    run(shouldDebug, request, token) {
+    runTestFile(parentPath, testInfo, runner, test) {
+        const command = (0, child_process_1.spawn)('vendor/bin/pest', [parentPath, '--teamcity', '--stderr'], { cwd: testInfo.workspaceFolder?.uri.path });
+        let output = '';
+        let failedTests = [];
+        let outMsg = '';
+        command.stdout.on('data', (data) => {
+            output = data.toString().trim().split(/\r\n|\n/).join(utils_1.EOL);
+            const failedRegex = /##teamcity\[testFailed name='([^]*)' message='([^]*)' details='([^]*) flowId/;
+            const testSuiteRegex = /##teamcity\[testSuiteStarted name='([^']*)'/;
+            const testRegex = /##teamcity\[testFinished name='([^]*)' duration='([^]*)' flowId/;
+            const failedMatch = output.match(failedRegex);
+            const testSuiteMatch = output.match(testSuiteRegex);
+            const testMatch = output.match(testRegex);
+            if (testSuiteMatch?.length) {
+                runner.appendOutput(`🚀 ${testSuiteMatch[1]}${utils_1.EOL}`);
+            }
+            if (failedMatch?.length) {
+                runner.appendOutput(`❌ ${failedMatch[1]}${utils_1.EOL}`);
+                failedTests.push({
+                    label: failedMatch[1],
+                    message: failedMatch[2],
+                    details: failedMatch[3]
+                });
+                test.children.forEach(testCase => {
+                    if (testCase.label === failedMatch[1]) {
+                        if (failedMatch[2].includes('Exception')) {
+                            runner.errored(testCase, new vscode.TestMessage(failedMatch[2]));
+                        }
+                        else {
+                            runner.failed(testCase, new vscode.TestMessage(failedMatch[2]));
+                        }
+                    }
+                });
+            }
+            if (testMatch?.length && !failedTests.some(test => test.label === testMatch[1])) {
+                runner.appendOutput(`✅ ${testMatch[1]}${utils_1.EOL}`);
+                test.children.forEach(testCase => {
+                    if (testCase.label === testMatch[1]) {
+                        runner.passed(testCase);
+                    }
+                });
+            }
+        });
+        command.on('exit', (code, signal) => {
+            if (code === 255) {
+                runner.appendOutput(output);
+            }
+            runner.end();
+        });
+    }
+    async run(shouldDebug, request, token) {
         const run = this.controller.createTestRun(request);
         const queue = [];
+        const testCasesParser = new TestCasesParser_1.default(this.controller);
         // Loop through all included tests, or all known tests, and add them to our queue
         if (request.include) {
             request.include.forEach(test => queue.push(test));
@@ -12848,42 +12918,22 @@ class TestRunner {
         while (queue.length > 0 && !token.isCancellationRequested) {
             const test = queue.pop();
             const testInfo = (0, utils_1.getType)(test);
+            const parentPath = test.uri.path;
             // Skip tests the user asked to exclude
             if (request.exclude?.includes(test)) {
                 continue;
             }
             switch (testInfo.caseType) {
                 case utils_1.ItemType.File:
+                    run.started(test);
                     if (test.children.size == 0) {
-                        // await TestItemParser.resolveTestItem(test, controller);
+                        testCasesParser.discover(test);
                     }
+                    this.runTestFile(parentPath, testInfo, run, test);
                     break;
                 case utils_1.ItemType.TestCase:
-                    // Otherwise, just run the test case.Note that we don't need to manually
-                    // set the state of parent tests; they'll be set automatically.
-                    const start = Date.now();
-                    const parentPath = test.uri.path;
-                    const testName = test.label;
-                    const command = `\u001b[32mvendor/bin/pest\u001b[0m ${parentPath} --filter \u001b[33m'${testName}'\u001b[0m `;
-                    run.appendOutput(`${command}${utils_1.EOL}${utils_1.EOL}${utils_1.EOL}${utils_1.EOL}`);
-                    run.started(test);
-                    run.appendOutput(`🚀 TEST STARTED${utils_1.EOL}`);
-                    this.executeTestCommand(parentPath, testName, testInfo)
-                        .then((outMsg) => {
-                        run.appendOutput(`✅ TEST PASSED${utils_1.EOL}`);
-                        run.passed(test, Date.now() - start);
-                        run.appendOutput(`${utils_1.EOL}${utils_1.EOL}${utils_1.EOL}${utils_1.EOL}`);
-                        run.appendOutput(outMsg);
-                    })
-                        .catch(({ errMsg, outMsg }) => {
-                        run.appendOutput(`❌ TEST FAILED${utils_1.EOL}`);
-                        run.failed(test, new vscode.TestMessage(errMsg), Date.now() - start);
-                        run.appendOutput(`${utils_1.EOL}${utils_1.EOL}${utils_1.EOL}${utils_1.EOL}`);
-                        run.appendOutput(outMsg);
-                    })
-                        .finally(() => {
-                        run.end();
-                    });
+                    const testCase = test.label;
+                    this.runTestCase(testCase, parentPath, testInfo, run, test);
                     break;
             }
         }

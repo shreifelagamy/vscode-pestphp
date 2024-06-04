@@ -15,8 +15,7 @@
         "workspaceContains:**/*.php"
     ],
     "main": "./dist/extension.js",
-    "contributes": {
-    },
+    "contributes": {},
     "scripts": {
         "vscode:prepublish": "yarn run package",
         "compile": "webpack",
@@ -44,6 +43,7 @@
         "webpack-cli": "^5.1.4"
     },
     "dependencies": {
+        "ansi-styles": "^6.2.1",
         "php-parser": "^3.1.5"
     }
 }

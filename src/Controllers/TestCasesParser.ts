@@ -48,7 +48,7 @@ export default class TestCasesParser {
         testCases.forEach(child => {
             const expression: any = child.expression
             const arg: any = expression.arguments[0];
-            const key = arg.value;
+            const key = expression.what.name == 'it' ? `it ${arg.value}` : arg.value;
             const value = arg.value;
 
             const testItemId = test.id + '::' + key.replace(/ /g, '_').replace(/-/g, '_');

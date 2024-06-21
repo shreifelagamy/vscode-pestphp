@@ -5,9 +5,10 @@ export enum ItemType {
     TestCase
 }
 export interface Info {
-    workspaceFolder: vscode.WorkspaceFolder | undefined;
+    workspaceFolder: vscode.WorkspaceFolder;
     caseType: ItemType.File | ItemType.TestCase;
     parentPath: vscode.Uri | undefined;
+    testId: string;
 };
 
 export const testData = new WeakMap<vscode.TestItem, Info>();

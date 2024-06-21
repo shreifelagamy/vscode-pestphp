@@ -1,4 +1,4 @@
-import { Call, Engine, ExpressionStatement, Node, Program } from 'php-parser';
+import { Call, Engine, ExpressionStatement, Location, Node, Program } from 'php-parser';
 import * as vscode from 'vscode';
 import { Info, ItemType, getType, testData } from '../utils';
 
@@ -32,31 +32,44 @@ export default class TestCasesParser {
         let expressions: ExpressionStatement[] = [];
 
         await childern.forEach((child: Node) => {
-            if (child.kind == 'expressionstatement') {
+            if (child.kind == 'expressionstatement') { // take only the functions
                 expressions.push(child as ExpressionStatement);
             }
         })
 
-        let testCases: ExpressionStatement[] = [];
+        let testCases: {
+            name: string,
+            loc: Location | null,
+            methodName: string
+        }[] = [];
+
         await expressions.forEach(child => {
             const exp = child.expression as Call
-            if (exp.what.name && (exp.what.name == 'test' || exp.what.name == 'it')) [
-                testCases.push(child)
-            ]
+
+            if (exp.what) {
+                switch (exp.what.kind) {
+                    case 'propertylookup':
+                        testCases.push({ name: exp.what.what.arguments[0].value!, loc: exp.what.what.arguments[0].loc, methodName: exp.what.what.what.name })
+                        break;
+
+                    case 'name':
+                        if (exp.what.name != 'beforeEach') {
+                            testCases.push({ name: exp.arguments[0].value!, loc: exp.arguments[0].loc, methodName: exp.what.name as string })
+                        }
+                        break;
+                }
+            }
         })
 
         testCases.forEach(child => {
-            const expression: any = child.expression
-            const arg: any = expression.arguments[0];
-            const key = expression.what.name == 'it' ? `it ${arg.value}` : arg.value;
-            const value = arg.value;
+            const key = child.methodName == 'it' ? `it ${child.name}` : child.name;
 
-            const testItemId = test.id + '::' + key.replace(/ /g, '_').replace(/-/g, '_');
+            const testItemId = test.id + '::' + key.trim().replace(/ /g, '_').replace(/-/g, '_');
             const childTestItem = this.controller.createTestItem(testItemId, key, uri);
 
-            if (expression.loc) {
-                const startLoc = new vscode.Position(expression.loc.start.line - 1, expression.loc.start.column);
-                const endLoc = new vscode.Position(expression.loc.end.line, expression.loc.end.column);
+            if (child.loc) {
+                const startLoc = new vscode.Position(child.loc.start.line - 1, child.loc.start.column);
+                const endLoc = new vscode.Position(child.loc.end.line, child.loc.end.column);
 
                 // TODO: enhance test key to include class name
                 childTestItem.range = new vscode.Range(startLoc, endLoc);
@@ -67,7 +80,8 @@ export default class TestCasesParser {
             let info: Info = {
                 workspaceFolder: parentTest.workspaceFolder,
                 caseType: ItemType.TestCase,
-                parentPath: uri
+                parentPath: uri,
+                testId: testItemId
             }
 
             testData.set(childTestItem, info);

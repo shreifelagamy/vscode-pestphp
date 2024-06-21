@@ -1,9 +1,12 @@
 import * as cp from 'child_process';
 import * as vscode from 'vscode';
 import { Info, ItemType, testData } from '../utils';
+import TestCasesParser from './TestCasesParser';
 
 export default class ParentParser {
+    protected testCaseParser: any;
     constructor(private controller: vscode.TestController) {
+        this.testCaseParser = new TestCasesParser(controller);
     }
 
     async discover() {
@@ -37,11 +40,13 @@ export default class ParentParser {
                 let info: Info = {
                     workspaceFolder: workspaceFolder,
                     caseType: ItemType.File,
-                    parentPath: undefined
+                    parentPath: undefined,
+                    testId: theClassName
                 }
 
                 testData.set(ParentTestItem, info);
                 this.controller.items.add(ParentTestItem);
+                this.testCaseParser.discover(ParentTestItem);
             }
         });
     }

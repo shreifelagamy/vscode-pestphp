@@ -1,4 +1,4 @@
-import { Call, Engine, ExpressionStatement, Location, Node, Program } from 'php-parser';
+import { Call, Engine, ExpressionStatement, Location, Node, Program, PropertyLookup, String } from 'php-parser';
 import * as vscode from 'vscode';
 import { Info, ItemType, getType, testData } from '../utils';
 
@@ -30,6 +30,7 @@ export default class TestCasesParser {
 
         const childern: Array<Node> = ast.children;
         let expressions: ExpressionStatement[] = [];
+        let childTests: vscode.TestItem[] = [];
 
         await childern.forEach((child: Node) => {
             if (child.kind == 'expressionstatement') { // take only the functions
@@ -49,12 +50,14 @@ export default class TestCasesParser {
             if (exp.what) {
                 switch (exp.what.kind) {
                     case 'propertylookup':
-                        testCases.push({ name: exp.what.what.arguments[0].value!, loc: exp.what.what.arguments[0].loc, methodName: exp.what.what.what.name })
+                        const what = (exp.what as unknown as PropertyLookup).what as Call;
+                        testCases.push({ name: (what.arguments[0] as String).value, loc: (what.arguments[0] as String).loc, methodName: what.what.name as string })
                         break;
 
                     case 'name':
                         if (exp.what.name != 'beforeEach') {
-                            testCases.push({ name: exp.arguments[0].value!, loc: exp.arguments[0].loc, methodName: exp.what.name as string })
+                            const args = exp.arguments[0] as String;
+                            testCases.push({ name: args.value, loc: args.loc, methodName: exp.what.name as string })
                         }
                         break;
                 }
@@ -71,20 +74,23 @@ export default class TestCasesParser {
                 const startLoc = new vscode.Position(child.loc.start.line - 1, child.loc.start.column);
                 const endLoc = new vscode.Position(child.loc.end.line, child.loc.end.column);
 
-                // TODO: enhance test key to include class name
                 childTestItem.range = new vscode.Range(startLoc, endLoc);
             }
 
-            test.children.add(childTestItem);
+
+            childTests.push(childTestItem);
 
             let info: Info = {
                 workspaceFolder: parentTest.workspaceFolder,
                 caseType: ItemType.TestCase,
                 parentPath: uri,
-                testId: testItemId
+                testId: testItemId,
+                testItem: childTestItem,
             }
 
             testData.set(childTestItem, info);
         })
+
+        test.children.replace(childTests);
     }
 }

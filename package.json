@@ -1,5 +1,5 @@
 {
-    "name": "pestphp-framework",
+    "name": "vscode-pestphp",
     "displayName": "Pest testing framework",
     "description": "Enable the support for the pest testing framework ",
     "version": "0.0.1",

@@ -38,28 +38,29 @@ const ParentParser_1 = __importDefault(__webpack_require__(2));
 const TestCasesParser_1 = __importDefault(__webpack_require__(5));
 const TestRunner_1 = __importDefault(__webpack_require__(151));
 // TODO: get composer to check if pest is downloaded
-function activate(context) {
+async function activate(context) {
+    let pestInstalled = false;
+    // Check if composer is installed
+    const files = await vscode.workspace.findFiles('composer.json');
+    if (files.length > 0) {
+        const content = await vscode.workspace.fs.readFile(files[0]);
+        const composerJson = JSON.parse(new TextDecoder('utf-8').decode(content));
+        if (composerJson.require && composerJson.require['pestphp/pest'] || composerJson['require-dev'] && composerJson['require-dev']['pestphp/pest']) {
+            pestInstalled = true;
+        }
+    }
+    if (!pestInstalled) {
+        return;
+    }
     const controller = vscode.tests.createTestController('PestPHPController', 'Pest PHP');
-    const parentParser = new ParentParser_1.default(controller);
+    context.subscriptions.push(controller);
+    const parentParser = new ParentParser_1.default(controller, context);
     const testCasesParser = new TestCasesParser_1.default(controller);
     const runner = new TestRunner_1.default(controller);
-    // TODO: add it to the subscriptions context
-    // context.subscriptions.push(controller);
-    controller.resolveHandler = async (test) => {
-        if (!test) {
-            await parentParser.discover();
-        }
-        else {
-            await testCasesParser.discover(test);
-        }
-        // controller.items.replace(testsuites);
-    };
-    const runProfile = controller.createRunProfile('Run', vscode.TestRunProfileKind.Run, (request, token) => {
+    parentParser.discover();
+    controller.createRunProfile('Run', vscode.TestRunProfileKind.Run, (request, token) => {
         runner.run(false, request, token);
     });
-    // controller.refreshHandler = async test => {
-    //     console.log('refresh', test)
-    // }
 }
 exports.activate = activate;
 
@@ -108,9 +109,11 @@ const utils_1 = __webpack_require__(4);
 const TestCasesParser_1 = __importDefault(__webpack_require__(5));
 class ParentParser {
     controller;
+    context;
     testCaseParser;
-    constructor(controller) {
+    constructor(controller, context) {
         this.controller = controller;
+        this.context = context;
         this.testCaseParser = new TestCasesParser_1.default(controller);
     }
     async discover() {
@@ -118,11 +121,14 @@ class ParentParser {
             return []; // handle the case of no open folders
         }
         return Promise.all(vscode.workspace.workspaceFolders.map(async (workspaceFolder) => {
+            const pattern = new vscode.RelativePattern(workspaceFolder, 'tests/**/*Test.php');
+            const exclude = new vscode.RelativePattern(workspaceFolder, '**/{.git,node_modules,vendor}/**');
+            this.startWatching(pattern, exclude);
             this.resolveTestParent(workspaceFolder);
         }));
     }
-    async resolveTestParent(workspaceFolder) {
-        const output = cp.execSync("./vendor/bin/pest --list-tests", { cwd: workspaceFolder.uri.path });
+    async resolveTestParent(workspaceFolder, file) {
+        const output = cp.execSync(`./vendor/bin/pest ${file?.path ?? ''} --list-tests`, { cwd: workspaceFolder.uri.path });
         const lines = output.toString().split('\n');
         const classNamesWithTests = await lines.filter(line => line.startsWith(' - P')).map(line => line.replace(' - P\\', '').replace('__pest_evaluable_', ''));
         let classNames = [];
@@ -138,13 +144,55 @@ class ParentParser {
                     workspaceFolder: workspaceFolder,
                     caseType: utils_1.ItemType.File,
                     parentPath: undefined,
-                    testId: theClassName
+                    testId: theClassName,
+                    testItem: ParentTestItem,
                 };
                 utils_1.testData.set(ParentTestItem, info);
                 this.controller.items.add(ParentTestItem);
                 this.testCaseParser.discover(ParentTestItem);
             }
         });
+    }
+    async startWatching(pattern, exclude) {
+        const watcher = vscode.workspace.createFileSystemWatcher(pattern);
+        watcher.onDidCreate(uri => {
+            const workspaceFolder = vscode.workspace.getWorkspaceFolder(uri);
+            if (workspaceFolder)
+                this.resolveTestParent(workspaceFolder, uri);
+        });
+        watcher.onDidChange(async (uri) => {
+            let parentTestItem;
+            await this.controller.items.forEach(item => {
+                if (item.uri?.path == uri.path) {
+                    parentTestItem = item;
+                    return;
+                }
+            });
+            if (parentTestItem) {
+                this.testCaseParser.discover(parentTestItem);
+            }
+        });
+        watcher.onDidDelete(async (uri) => {
+            let parentTestItem;
+            // Find the parent test item to delete
+            await this.controller.items.forEach(item => {
+                if (item.uri?.path == uri.path) {
+                    parentTestItem = item;
+                    return; // Exit the loop once the item is found
+                }
+            });
+            // If the parent test item is found
+            if (parentTestItem) {
+                // Delete all children of the parent test item
+                parentTestItem.children.forEach(child => {
+                    parentTestItem.children.delete(child.id); // Delete the child from the parent
+                });
+                utils_1.testData.delete(parentTestItem); // Delete the parent test item from the test data
+                // Finally, delete the parent test item from the controller
+                this.controller.items.delete(parentTestItem.id);
+            }
+        });
+        this.context.subscriptions.push(watcher);
     }
 }
 exports["default"] = ParentParser;
@@ -233,6 +281,7 @@ class TestCasesParser {
         const ast = await parser.parseCode(content, test.label);
         const childern = ast.children;
         let expressions = [];
+        let childTests = [];
         await childern.forEach((child) => {
             if (child.kind == 'expressionstatement') { // take only the functions
                 expressions.push(child);
@@ -244,11 +293,13 @@ class TestCasesParser {
             if (exp.what) {
                 switch (exp.what.kind) {
                     case 'propertylookup':
-                        testCases.push({ name: exp.what.what.arguments[0].value, loc: exp.what.what.arguments[0].loc, methodName: exp.what.what.what.name });
+                        const what = exp.what.what;
+                        testCases.push({ name: what.arguments[0].value, loc: what.arguments[0].loc, methodName: what.what.name });
                         break;
                     case 'name':
                         if (exp.what.name != 'beforeEach') {
-                            testCases.push({ name: exp.arguments[0].value, loc: exp.arguments[0].loc, methodName: exp.what.name });
+                            const args = exp.arguments[0];
+                            testCases.push({ name: args.value, loc: args.loc, methodName: exp.what.name });
                         }
                         break;
                 }
@@ -261,18 +312,19 @@ class TestCasesParser {
             if (child.loc) {
                 const startLoc = new vscode.Position(child.loc.start.line - 1, child.loc.start.column);
                 const endLoc = new vscode.Position(child.loc.end.line, child.loc.end.column);
-                // TODO: enhance test key to include class name
                 childTestItem.range = new vscode.Range(startLoc, endLoc);
             }
-            test.children.add(childTestItem);
+            childTests.push(childTestItem);
             let info = {
                 workspaceFolder: parentTest.workspaceFolder,
                 caseType: utils_1.ItemType.TestCase,
                 parentPath: uri,
-                testId: testItemId
+                testId: testItemId,
+                testItem: childTestItem,
             };
             utils_1.testData.set(childTestItem, info);
         });
+        test.children.replace(childTests);
     }
 }
 exports["default"] = TestCasesParser;
@@ -12745,35 +12797,10 @@ module.exports = Expression.extends(
 /***/ (function(__unused_webpack_module, exports, __webpack_require__) {
 
 
-var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    var desc = Object.getOwnPropertyDescriptor(m, k);
-    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
-      desc = { enumerable: true, get: function() { return m[k]; } };
-    }
-    Object.defineProperty(o, k2, desc);
-}) : (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    o[k2] = m[k];
-}));
-var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
-    Object.defineProperty(o, "default", { enumerable: true, value: v });
-}) : function(o, v) {
-    o["default"] = v;
-});
-var __importStar = (this && this.__importStar) || function (mod) {
-    if (mod && mod.__esModule) return mod;
-    var result = {};
-    if (mod != null) for (var k in mod) if (k !== "default" && Object.prototype.hasOwnProperty.call(mod, k)) __createBinding(result, mod, k);
-    __setModuleDefault(result, mod);
-    return result;
-};
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", ({ value: true }));
-const child_process_1 = __webpack_require__(3);
-const vscode = __importStar(__webpack_require__(1));
 const TestCommandHandler_1 = __importDefault(__webpack_require__(152));
 class TestRunner {
     controller;
@@ -12781,147 +12808,6 @@ class TestRunner {
     failedRegex = /##teamcity\[testFailed name='([^]*)' message='([^]*)' details='([^]*) flowId/;
     constructor(controller) {
         this.controller = controller;
-    }
-    // private runTestCase(testCase: string, parentPath: string, testInfo: Info, test: vscode.TestItem): void {
-    //     this.runner.started(test);
-    //     const command = spawn('vendor/bin/pest', [parentPath, '--teamcity', '--stderr', '--filter', testCase], { cwd: testInfo.workspaceFolder?.uri.path });
-    //     let isFailed: boolean = false;
-    //     let hasException: boolean = false;
-    //     let errorMsg: string = '';
-    //     let testSuite: string = '';
-    //     command.on('exit', (code, signal) => {
-    //         if (isFailed) {
-    //             this.runner.appendOutput(`❌ ${testCase}${EOL}`);
-    //             if (hasException) {
-    //                 this.runner.errored(test, new vscode.TestMessage(errorMsg))
-    //             } else {
-    //                 this.runner.failed(test, new vscode.TestMessage(errorMsg))
-    //             }
-    //         } else {
-    //             this.runner.appendOutput(`✅ ${testCase}${EOL}`);
-    //             this.runner.passed(test)
-    //         }
-    //         this.runner.end();
-    //     });
-    //     command.stdout.on('data', (data) => {
-    //         const output: string = data.toString().trim().split(/\r\n|\n/).join(EOL);
-    //         const testSuiteRegex = /##teamcity\[testSuiteStarted name='([^']*)'/;
-    //         const regex = /##teamcity\[testFailed .*? message='([^']*)'/;
-    //         const match = output.match(regex);
-    //         const testSuiteMatch = output.match(testSuiteRegex);
-    //         if (testSuiteMatch?.length) {
-    //             this.runner.appendOutput(`🚀 \u001b[32m${testSuiteMatch[1]}\u001b[33m '${testCase}'\u001b[0m ${EOL}`);
-    //         }
-    //         if (match?.length) {
-    //             isFailed = true
-    //             hasException = match[1].includes('Exception')
-    //             errorMsg = match[1]
-    //         }
-    //     });
-    // }
-    // private runTestFile(parentPath: string, testInfo: Info, test: vscode.TestItem): void {
-    //     const command = spawn('vendor/bin/pest', [parentPath, '--teamcity', '--stderr'], { cwd: testInfo.workspaceFolder?.uri.path });
-    //     let output: string = '';
-    //     let failedTests: {
-    //         label: string;
-    //         message: string;
-    //         details: string;
-    //     }[] = [];
-    //     let outMsg: string = ''
-    //     command.stdout.on('data', (data) => {
-    //         output = data.toString().trim().split(/\r\n|\n/).join(EOL);
-    //         const failedRegex = /##teamcity\[testFailed name='([^]*)' message='([^]*)' details='([^]*) flowId/;
-    //         const testSuiteRegex = /##teamcity\[testSuiteStarted name='([^']*)'/;
-    //         const testRegex = /##teamcity\[testFinished name='([^]*)' duration='([^]*)' flowId/;
-    //         const failedMatch = output.match(failedRegex);
-    //         const testSuiteMatch = output.match(testSuiteRegex);
-    //         const testMatch = output.match(testRegex);
-    //         if (testSuiteMatch?.length) {
-    //             this.runner.appendOutput(`🚀 ${testSuiteMatch[1]}${EOL}`);
-    //         }
-    //         if (failedMatch?.length) {
-    //             this.runner.appendOutput(`❌ ${failedMatch[1]}${EOL}`);
-    //             failedTests.push({
-    //                 label: failedMatch[1],
-    //                 message: failedMatch[2],
-    //                 details: failedMatch[3]
-    //             });
-    //             test.children.forEach(testCase => {
-    //                 if (testCase.label === failedMatch[1]) {
-    //                     if (failedMatch[2].includes('Exception')) {
-    //                         this.runner.errored(testCase, new vscode.TestMessage(failedMatch[2]));
-    //                     } else {
-    //                         this.runner.failed(testCase, new vscode.TestMessage(failedMatch[2]));
-    //                     }
-    //                 }
-    //             })
-    //         }
-    //         if (testMatch?.length && !failedTests.some(test => test.label === testMatch[1])) {
-    //             this.runner.appendOutput(`✅ ${testMatch[1]}${EOL}`);
-    //             test.children.forEach(testCase => {
-    //                 if (testCase.label === testMatch[1]) {
-    //                     this.runner.passed(testCase);
-    //                 }
-    //             })
-    //         }
-    //     });
-    //     command.on('exit', (code, signal) => {
-    //         if (code === 255) {
-    //             this.runner.appendOutput(output);
-    //         }
-    //         this.runner.end();
-    //     });
-    // }
-    runAll() {
-        vscode.workspace.workspaceFolders?.forEach(workspaceFolder => {
-            const command = (0, child_process_1.spawn)('vendor/bin/pest', ['--teamcity', '--stderr'], { cwd: workspaceFolder.uri.path });
-            let output = '';
-            let failedTests = [];
-            let outMsg = '';
-            command.stdout.on('data', (data) => {
-                output = data.toString();
-                const testSuiteRegex = /##teamcity\[testSuiteStarted name='([^']*)'/;
-                const failedRegex = /##teamcity\[testFailed name='([^]*)' message='([^]*)' details='([^]*) flowId/;
-                const testRegex = /##teamcity\[testFinished name='([^]*)' duration='([^]*)' flowId/;
-                const testSuiteMatch = output.match(testSuiteRegex);
-                const failedMatch = output.match(failedRegex);
-                const testMatch = output.match(testRegex);
-                const lines = output.split(/\r\n|\n/);
-                while (lines.length > 1) {
-                    console.log(lines);
-                    lines.shift();
-                    // this.processLine(lines.shift()!, command);
-                }
-                // console.log(testSuiteMatch);
-                // if (testSuiteMatch?.length) {
-                //     runner.appendOutput(`🚀 ${testSuiteMatch[1]}${EOL}`);
-                //     if (testSuiteMatch[3]) {
-                //         runner.appendOutput(`🚀 ${testSuiteMatch[3]}${EOL}`);
-                //     }
-                // }
-                // if (failedMatch?.length) {
-                //     runner.appendOutput(`❌ ${failedMatch[1]}${EOL}`);
-                //     failedTests.push({
-                //         label: failedMatch[1],
-                //         message: failedMatch[2],
-                //         details: failedMatch[3]
-                //     });
-                //     failedTests.forEach(test => {
-                //         runner.failed(runner.testStates.get(test.label)!, new vscode.TestMessage(test.message));
-                //     })
-                // }
-                // if (testMatch?.length && !failedTests.some(test => test.label === testMatch[1])) {
-                //     runner.appendOutput(`✅ ${testMatch[1]}${EOL}`);
-                //     runner.passed(runner.testStates.get(testMatch[1])!);
-                // }
-            });
-            // command.on('exit', (code, signal) => {
-            //     if (code === 255) {
-            //         this.runner.appendOutput(output);
-            //     }
-            //     runner.end();
-            // });
-        });
     }
     gatherTestItems(collection) {
         const items = [];
@@ -12935,23 +12821,6 @@ class TestRunner {
             }
             if (!test.canResolveChildren) {
                 runner.enqueued(test);
-                // const testInfo = getType(test);
-                // const result = spawnSync('vendor/bin/pest', [testInfo.parentPath?.path, '--teamcity', '--stderr', '--filter', test.label], { cwd: testInfo.workspaceFolder?.uri.path });
-                // const output = result.stdout.toString();
-                // // check if failed message exist
-                // if( this.failedRegex.test(output) ) {
-                //     const match = output.match(this.failedRegex);
-                //     if (match?.length) {
-                //         if (match[2].includes('Exception')) {
-                //             runner.errored(test, new vscode.TestMessage(match[2]));
-                //         } else {
-                //             runner.failed(test, new vscode.TestMessage(match[2]));
-                //         }
-                //     }
-                // } else {
-                //     runner.passed(test);
-                // }
-                // runner.appendOutput(output);
                 this.queue.push({ test });
             }
             else {
@@ -12971,36 +12840,6 @@ class TestRunner {
         this.pushToQueue(this.gatherTestItems(testItems), runner, request);
         // Determine the command to run
         new TestCommandHandler_1.default(request, this.controller, runner, this.queue).run();
-        // this.determineTheCommandToRun(request)
-        // Run the command
-        // Match the output and trigger test case status
-        // const queue = new TestQueueHandler(request, runner).discoverTests(this.gatherTestItems(this.controller.items));
-        // Loop through all included tests, or all known tests, and add them to our queue
-        // if (this.request.include) {
-        //     this.request.include.forEach(test => this.queue.push(test));
-        // } else {
-        // console.log(this.queue);
-        //     this.runAll()
-        // }
-        // while (this.queue.length > 0 && !token.isCancellationRequested) {
-        //     const test = this.queue.pop()!;
-        //     const testInfo = getType(test);
-        //     const parentPath: string = test.uri!.path;
-        //     // Skip tests the user asked to exclude
-        //     if (this.request.exclude?.includes(test)) {
-        //         continue;
-        //     }
-        //     switch (testInfo.caseType) {
-        //         case ItemType.File:
-        //             this.runner.started(test);
-        //             this.runTestFile(parentPath, testInfo, test)
-        //             break;
-        //         case ItemType.TestCase:
-        //             const testCase = test.label;
-        //             this.runTestCase(testCase, parentPath, testInfo, test);
-        //             break;
-        //     }
-        // }
     }
 }
 exports["default"] = TestRunner;
@@ -13008,10 +12847,14 @@ exports["default"] = TestRunner;
 
 /***/ }),
 /* 152 */
-/***/ ((__unused_webpack_module, exports, __webpack_require__) => {
+/***/ (function(__unused_webpack_module, exports, __webpack_require__) {
 
 
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
 Object.defineProperty(exports, "__esModule", ({ value: true }));
+const ansi_styles_1 = __importDefault(__webpack_require__(153));
 const child_process_1 = __webpack_require__(3);
 const vscode_1 = __webpack_require__(1);
 const utils_1 = __webpack_require__(4);
@@ -13024,6 +12867,7 @@ class TestCommandHandler {
     testCases = [];
     workspace = [];
     testSuitePattern = /##teamcity\[testSuiteStarted\s+name='([^']+)'/;
+    testSuiteFinishedPattern = /##teamcity\[testSuiteFinished\s+name='([^']+)'/;
     testStartedPattern = /##teamcity\[testStarted\s+name='([^']+)'/;
     testFailedPattern = /##teamcity\[testFailed\s+name='([^']+)'\s+message='([^']+)'/;
     testFinishedPattern = /##teamcity\[testFinished\s+name='([^']+)'/;
@@ -13059,6 +12903,7 @@ class TestCommandHandler {
             let suiteName = '';
             let isFailed = false;
             let isSkipped = false;
+            let testSuitedStarted = false;
             command.stdout.on('data', (data) => {
                 const output = data.toString();
                 const lines = output.split(/\r\n|\n/);
@@ -13069,40 +12914,56 @@ class TestCommandHandler {
                     let testFailedMatch = line.match(this.testFailedPattern);
                     let testFinishedMatch = line.match(this.testFinishedPattern);
                     let testSkippedMatch = line.match(this.testSkippedPattern);
+                    let testSuiteFinishedMatch = line.match(this.testSuiteFinishedPattern);
                     if (testSuiteMatch) {
                         suiteName = testSuiteMatch[1];
                     }
                     else if (testStartedMatch) {
+                        if (!testSuitedStarted) {
+                            this.runner.appendOutput(`${utils_1.EOL}${suiteName}${utils_1.EOL}`);
+                        }
+                        testSuitedStarted = true;
                         const testId = `${suiteName}::${testStartedMatch[1].replace(/ /g, '_').replace(/-/g, '_')}`;
                         const testCase = this.queue.find(item => item.test.id == testId)?.test;
-                        this.runner.appendOutput(`${testId} ${utils_1.EOL}`);
-                        this.runner.started(testCase);
+                        if (testCase) {
+                            this.runner.started(testCase);
+                        }
                     }
                     else if (testFailedMatch) {
                         const testId = `${suiteName}::${testFailedMatch[1].replace(/ /g, '_').replace(/-/g, '_')}`;
                         const testCase = this.queue.find(item => item.test.id == testId)?.test;
-                        if (testFailedMatch[2].includes('Exception')) {
-                            this.runner.errored(testCase, new vscode_1.TestMessage(testFailedMatch[2].split('\n')[0]));
-                        }
-                        else {
-                            this.runner.failed(testCase, new vscode_1.TestMessage(testFailedMatch[2]));
+                        if (testCase) {
+                            if (testFailedMatch[2].includes('Exception')) {
+                                this.runner.errored(testCase, new vscode_1.TestMessage(testFailedMatch[2].split('\n')[0]));
+                            }
+                            else {
+                                this.runner.failed(testCase, new vscode_1.TestMessage(testFailedMatch[2]));
+                            }
+                            this.runner.appendOutput(`${ansi_styles_1.default.color.red.open}⨯${ansi_styles_1.default.color.red.close} ${ansi_styles_1.default.color.gray.open}${testCase?.label}${ansi_styles_1.default.color.gray.close} ${utils_1.EOL}`);
                         }
                         isFailed = true;
                     }
                     else if (testSkippedMatch) {
                         const testId = `${suiteName}::${testSkippedMatch[1].replace(/ /g, '_').replace(/-/g, '_')}`;
                         const testCase = this.queue.find(item => item.test.id == testId)?.test;
-                        this.runner.skipped(testCase);
+                        if (testCase) {
+                            this.runner.skipped(testCase);
+                            this.runner.appendOutput(`${ansi_styles_1.default.color.yellow.open}-${ansi_styles_1.default.color.yellow.close} ${ansi_styles_1.default.color.gray.open}${testCase?.label}${ansi_styles_1.default.color.gray.close}${utils_1.EOL}`);
+                        }
                         isSkipped = true;
                     }
                     else if (testFinishedMatch) {
                         const testId = `${suiteName}::${testFinishedMatch[1].replace(/ /g, '_').replace(/-/g, '_')}`;
                         const testCase = this.queue.find(item => item.test.id == testId)?.test;
-                        if (!isFailed && !isSkipped) {
+                        if (!isFailed && !isSkipped && testCase) {
                             this.runner.passed(testCase);
+                            this.runner.appendOutput(`${ansi_styles_1.default.color.green.open}✓${ansi_styles_1.default.color.green.close} ${ansi_styles_1.default.color.gray.open}${testCase?.label}${ansi_styles_1.default.color.gray.close}${utils_1.EOL}`);
                         }
                         isFailed = false;
                         isSkipped = false;
+                    }
+                    else if (testSuiteFinishedMatch) {
+                        testSuitedStarted = false;
                     }
                 }
             });
@@ -13124,6 +12985,243 @@ class TestCommandHandler {
     }
 }
 exports["default"] = TestCommandHandler;
+
+
+/***/ }),
+/* 153 */
+/***/ ((__unused_webpack___webpack_module__, __webpack_exports__, __webpack_require__) => {
+
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   backgroundColorNames: () => (/* binding */ backgroundColorNames),
+/* harmony export */   colorNames: () => (/* binding */ colorNames),
+/* harmony export */   "default": () => (__WEBPACK_DEFAULT_EXPORT__),
+/* harmony export */   foregroundColorNames: () => (/* binding */ foregroundColorNames),
+/* harmony export */   modifierNames: () => (/* binding */ modifierNames)
+/* harmony export */ });
+const ANSI_BACKGROUND_OFFSET = 10;
+
+const wrapAnsi16 = (offset = 0) => code => `\u001B[${code + offset}m`;
+
+const wrapAnsi256 = (offset = 0) => code => `\u001B[${38 + offset};5;${code}m`;
+
+const wrapAnsi16m = (offset = 0) => (red, green, blue) => `\u001B[${38 + offset};2;${red};${green};${blue}m`;
+
+const styles = {
+	modifier: {
+		reset: [0, 0],
+		// 21 isn't widely supported and 22 does the same thing
+		bold: [1, 22],
+		dim: [2, 22],
+		italic: [3, 23],
+		underline: [4, 24],
+		overline: [53, 55],
+		inverse: [7, 27],
+		hidden: [8, 28],
+		strikethrough: [9, 29],
+	},
+	color: {
+		black: [30, 39],
+		red: [31, 39],
+		green: [32, 39],
+		yellow: [33, 39],
+		blue: [34, 39],
+		magenta: [35, 39],
+		cyan: [36, 39],
+		white: [37, 39],
+
+		// Bright color
+		blackBright: [90, 39],
+		gray: [90, 39], // Alias of `blackBright`
+		grey: [90, 39], // Alias of `blackBright`
+		redBright: [91, 39],
+		greenBright: [92, 39],
+		yellowBright: [93, 39],
+		blueBright: [94, 39],
+		magentaBright: [95, 39],
+		cyanBright: [96, 39],
+		whiteBright: [97, 39],
+	},
+	bgColor: {
+		bgBlack: [40, 49],
+		bgRed: [41, 49],
+		bgGreen: [42, 49],
+		bgYellow: [43, 49],
+		bgBlue: [44, 49],
+		bgMagenta: [45, 49],
+		bgCyan: [46, 49],
+		bgWhite: [47, 49],
+
+		// Bright color
+		bgBlackBright: [100, 49],
+		bgGray: [100, 49], // Alias of `bgBlackBright`
+		bgGrey: [100, 49], // Alias of `bgBlackBright`
+		bgRedBright: [101, 49],
+		bgGreenBright: [102, 49],
+		bgYellowBright: [103, 49],
+		bgBlueBright: [104, 49],
+		bgMagentaBright: [105, 49],
+		bgCyanBright: [106, 49],
+		bgWhiteBright: [107, 49],
+	},
+};
+
+const modifierNames = Object.keys(styles.modifier);
+const foregroundColorNames = Object.keys(styles.color);
+const backgroundColorNames = Object.keys(styles.bgColor);
+const colorNames = [...foregroundColorNames, ...backgroundColorNames];
+
+function assembleStyles() {
+	const codes = new Map();
+
+	for (const [groupName, group] of Object.entries(styles)) {
+		for (const [styleName, style] of Object.entries(group)) {
+			styles[styleName] = {
+				open: `\u001B[${style[0]}m`,
+				close: `\u001B[${style[1]}m`,
+			};
+
+			group[styleName] = styles[styleName];
+
+			codes.set(style[0], style[1]);
+		}
+
+		Object.defineProperty(styles, groupName, {
+			value: group,
+			enumerable: false,
+		});
+	}
+
+	Object.defineProperty(styles, 'codes', {
+		value: codes,
+		enumerable: false,
+	});
+
+	styles.color.close = '\u001B[39m';
+	styles.bgColor.close = '\u001B[49m';
+
+	styles.color.ansi = wrapAnsi16();
+	styles.color.ansi256 = wrapAnsi256();
+	styles.color.ansi16m = wrapAnsi16m();
+	styles.bgColor.ansi = wrapAnsi16(ANSI_BACKGROUND_OFFSET);
+	styles.bgColor.ansi256 = wrapAnsi256(ANSI_BACKGROUND_OFFSET);
+	styles.bgColor.ansi16m = wrapAnsi16m(ANSI_BACKGROUND_OFFSET);
+
+	// From https://github.com/Qix-/color-convert/blob/3f0e0d4e92e235796ccb17f6e85c72094a651f49/conversions.js
+	Object.defineProperties(styles, {
+		rgbToAnsi256: {
+			value: (red, green, blue) => {
+				// We use the extended greyscale palette here, with the exception of
+				// black and white. normal palette only has 4 greyscale shades.
+				if (red === green && green === blue) {
+					if (red < 8) {
+						return 16;
+					}
+
+					if (red > 248) {
+						return 231;
+					}
+
+					return Math.round(((red - 8) / 247) * 24) + 232;
+				}
+
+				return 16
+					+ (36 * Math.round(red / 255 * 5))
+					+ (6 * Math.round(green / 255 * 5))
+					+ Math.round(blue / 255 * 5);
+			},
+			enumerable: false,
+		},
+		hexToRgb: {
+			value: hex => {
+				const matches = /[a-f\d]{6}|[a-f\d]{3}/i.exec(hex.toString(16));
+				if (!matches) {
+					return [0, 0, 0];
+				}
+
+				let [colorString] = matches;
+
+				if (colorString.length === 3) {
+					colorString = [...colorString].map(character => character + character).join('');
+				}
+
+				const integer = Number.parseInt(colorString, 16);
+
+				return [
+					/* eslint-disable no-bitwise */
+					(integer >> 16) & 0xFF,
+					(integer >> 8) & 0xFF,
+					integer & 0xFF,
+					/* eslint-enable no-bitwise */
+				];
+			},
+			enumerable: false,
+		},
+		hexToAnsi256: {
+			value: hex => styles.rgbToAnsi256(...styles.hexToRgb(hex)),
+			enumerable: false,
+		},
+		ansi256ToAnsi: {
+			value: code => {
+				if (code < 8) {
+					return 30 + code;
+				}
+
+				if (code < 16) {
+					return 90 + (code - 8);
+				}
+
+				let red;
+				let green;
+				let blue;
+
+				if (code >= 232) {
+					red = (((code - 232) * 10) + 8) / 255;
+					green = red;
+					blue = red;
+				} else {
+					code -= 16;
+
+					const remainder = code % 36;
+
+					red = Math.floor(code / 36) / 5;
+					green = Math.floor(remainder / 6) / 5;
+					blue = (remainder % 6) / 5;
+				}
+
+				const value = Math.max(red, green, blue) * 2;
+
+				if (value === 0) {
+					return 30;
+				}
+
+				// eslint-disable-next-line no-bitwise
+				let result = 30 + ((Math.round(blue) << 2) | (Math.round(green) << 1) | Math.round(red));
+
+				if (value === 2) {
+					result += 60;
+				}
+
+				return result;
+			},
+			enumerable: false,
+		},
+		rgbToAnsi: {
+			value: (red, green, blue) => styles.ansi256ToAnsi(styles.rgbToAnsi256(red, green, blue)),
+			enumerable: false,
+		},
+		hexToAnsi: {
+			value: hex => styles.ansi256ToAnsi(styles.hexToAnsi256(hex)),
+			enumerable: false,
+		},
+	});
+
+	return styles;
+}
+
+const ansiStyles = assembleStyles();
+
+/* harmony default export */ const __WEBPACK_DEFAULT_EXPORT__ = (ansiStyles);
 
 
 /***/ })
@@ -13152,6 +13250,35 @@ exports["default"] = TestCommandHandler;
 /******/ 		// Return the exports of the module
 /******/ 		return module.exports;
 /******/ 	}
+/******/ 	
+/************************************************************************/
+/******/ 	/* webpack/runtime/define property getters */
+/******/ 	(() => {
+/******/ 		// define getter functions for harmony exports
+/******/ 		__webpack_require__.d = (exports, definition) => {
+/******/ 			for(var key in definition) {
+/******/ 				if(__webpack_require__.o(definition, key) && !__webpack_require__.o(exports, key)) {
+/******/ 					Object.defineProperty(exports, key, { enumerable: true, get: definition[key] });
+/******/ 				}
+/******/ 			}
+/******/ 		};
+/******/ 	})();
+/******/ 	
+/******/ 	/* webpack/runtime/hasOwnProperty shorthand */
+/******/ 	(() => {
+/******/ 		__webpack_require__.o = (obj, prop) => (Object.prototype.hasOwnProperty.call(obj, prop))
+/******/ 	})();
+/******/ 	
+/******/ 	/* webpack/runtime/make namespace object */
+/******/ 	(() => {
+/******/ 		// define __esModule on exports
+/******/ 		__webpack_require__.r = (exports) => {
+/******/ 			if(typeof Symbol !== 'undefined' && Symbol.toStringTag) {
+/******/ 				Object.defineProperty(exports, Symbol.toStringTag, { value: 'Module' });
+/******/ 			}
+/******/ 			Object.defineProperty(exports, '__esModule', { value: true });
+/******/ 		};
+/******/ 	})();
 /******/ 	
 /************************************************************************/
 /******/ 	

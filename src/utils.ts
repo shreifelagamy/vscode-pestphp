@@ -9,6 +9,7 @@ export interface Info {
     caseType: ItemType.File | ItemType.TestCase;
     parentPath: vscode.Uri | undefined;
     testId: string;
+    testItem: vscode.TestItem;
 };
 
 export const testData = new WeakMap<vscode.TestItem, Info>();

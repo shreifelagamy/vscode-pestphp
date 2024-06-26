@@ -25,6 +25,7 @@ export default class TestCommandHandler {
                 if (info.caseType == ItemType.File) {
                     this.parentPaths.push(testItem.uri!.path)
                 } else if (info.caseType == ItemType.TestCase) {
+                    this.parentPaths.push(testItem.parent!.uri!.path)
                     this.testCases.push(testItem.label)
                 }
 

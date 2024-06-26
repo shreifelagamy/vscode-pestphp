@@ -95,7 +95,7 @@ export default class ParentParser {
             if (parentTestItem) {
                 // Delete all children of the parent test item
                 parentTestItem.children.forEach(child => {
-                    parentTestItem.children.delete(child.id); // Delete the child from the parent
+                    parentTestItem!.children.delete(child.id); // Delete the child from the parent
                 });
 
                 testData.delete(parentTestItem); // Delete the parent test item from the test data

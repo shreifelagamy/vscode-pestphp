@@ -12886,6 +12886,7 @@ class TestCommandHandler {
                     this.parentPaths.push(testItem.uri.path);
                 }
                 else if (info.caseType == utils_1.ItemType.TestCase) {
+                    this.parentPaths.push(testItem.parent.uri.path);
                     this.testCases.push(testItem.label);
                 }
                 this.workspace.push(info.workspaceFolder);

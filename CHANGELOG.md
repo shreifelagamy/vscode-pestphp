@@ -1,9 +1,7 @@
-# Change Log
+## 1.0.0
 
-All notable changes to the "pest-testing-framework" extension will be documented in this file.
-
-Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how to structure this file.
-
-## [Unreleased]
-
-- Initial release
+- Support listing all test cases within the project.
+- Show failed test messages with detailed failure messages.
+- Run test cases directly from the file editor.
+- Run test cases from the sidebar
+- Show failed, skipped, and passed test in the sidebar.

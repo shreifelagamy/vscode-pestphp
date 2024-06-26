@@ -1,71 +1,54 @@
-# pest-testing-framework README
+# PEST PHP for VSCode
 
-This is the README for your extension "pest-testing-framework". After writing up a brief description, we recommend including the following sections.
+This Visual Studio Code extension provides comprehensive support for the PEST PHP testing framework, enhancing your testing workflow within VS Code.
 
 ## Features
 
-Describe specific features of your extension including screenshots of your extension in action. Image paths are relative to this README file.
+This extension introduces several powerful features to improve your experience with PEST PHP in Visual Studio Code:
 
-For example if there is an image subfolder under your extension project workspace:
+- **List All Test Cases**: Easily view all available test cases within your project.
+- **Show Failed Test Messages**: Directly see which tests failed and why, with detailed failure messages alongside the failed test cases.
+- **Run Test Case from File**: Conveniently run specific test cases directly from the file editor with a simple click or shortcut.
 
-\!\[feature X\]\(images/feature-x.png\)
+These features are designed to streamline your testing process, making it more efficient and integrated within your VS Code environment.
 
-> Tip: Many popular extensions utilize animations. This is an excellent way to show off your extension! We recommend short, focused animations that are easy to follow.
+> **Note**: This is the first release of the extension, focusing on core functionalities to enhance your PEST PHP testing. Future updates will aim to expand features and improve user experience.
+
+## Supported OS
+
+This extension has been tested and confirmed to work on the following operating systems:
+
+- **OSX**: Fully supported and tested.
+
+> **Linux Support**: Currently, Linux OS has not been tested. We welcome feedback and contributions to extend support to Linux users in future releases.
+
+> **Windows Support**: Currently, Windows OS has not been tested. We welcome feedback and contributions to extend support to Windows users in future releases.
 
 ## Requirements
 
-If you have any requirements or dependencies, add a section describing those and how to install and configure them.
+To use this extension, ensure that you have PEST PHP installed and configured within your project. For more information on setting up PEST PHP, visit the [official PEST PHP documentation](https://pestphp.com/docs/installation).
 
-## Extension Settings
-
-Include if your extension adds any VS Code settings through the `contributes.configuration` extension point.
-
-For example:
-
-This extension contributes the following settings:
-
-* `myExtension.enable`: Enable/disable this extension.
-* `myExtension.thing`: Set to `blah` to do something.
 
 ## Known Issues
 
-Calling out known issues can help limit users opening duplicate issues against your extension.
+As this is the first release, there might be undiscovered issues. We encourage users to report any bugs or issues they encounter to help improve the extension.
 
-## Release Notes
+## Contributing
 
-Users appreciate release notes as you update your extension.
+We have a comprehensive list of tasks and enhancements planned for future releases in our TODO file. If you're interested in contributing and supporting the development of this extension, here's how you can help:
 
-### 1.0.0
+1. **Check the TODO File**: Start by reviewing the TODO file in our repository. It contains a list of pending tasks, feature requests, and known issues that need attention.
 
-Initial release of ...
+2. **Pick a Task**: Choose a task that you're interested in working on. Tasks vary in complexity and scope, so there's something for everyone, whether you're a beginner or an experienced developer.
 
-### 1.0.1
+3. **Get in Touch**: Before you start working on a task, please get in touch with us (details in the GitHub repository). This helps us coordinate contributions and ensures that multiple people aren't working on the same issue simultaneously.
 
-Fixed issue #.
+4. **Submit Your Contribution**: After completing a task, submit your contribution through a pull request. Please include a detailed description of your changes and any other relevant information.
 
-### 1.1.0
+Your contributions are invaluable to us, and by helping with the tasks listed in the TODO file, you're directly impacting the improvement and growth of this extension. Together, we can make this tool even better for the PEST PHP community.
 
-Added features X, Y, and Z.
+Thank you for considering to contribute and support our project. We look forward to seeing your contributions!
 
 ---
 
-## Following extension guidelines
-
-Ensure that you've read through the extensions guidelines and follow the best practices for creating your extension.
-
-* [Extension Guidelines](https://code.visualstudio.com/api/references/extension-guidelines)
-
-## Working with Markdown
-
-You can author your README using Visual Studio Code. Here are some useful editor keyboard shortcuts:
-
-* Split the editor (`Cmd+\` on macOS or `Ctrl+\` on Windows and Linux).
-* Toggle preview (`Shift+Cmd+V` on macOS or `Shift+Ctrl+V` on Windows and Linux).
-* Press `Ctrl+Space` (Windows, Linux, macOS) to see a list of Markdown snippets.
-
-## For more information
-
-* [Visual Studio Code's Markdown Support](http://code.visualstudio.com/docs/languages/markdown)
-* [Markdown Syntax Reference](https://help.github.com/articles/markdown-basics/)
-
-**Enjoy!**
+We hope this extension significantly improves your testing workflow with PEST PHP in Visual Studio Code. Happy testing!

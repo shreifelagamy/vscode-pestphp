@@ -1,8 +1,14 @@
 Todo:
   ✔ Register the controller using subscription @done(24-06-25 14:38)
-  ☐ Watch test files and update accordingly
+  ✔ Watch test files and update accordingly @done(24-06-26 15:37)
   ✔ Check the composer file for pest download before starting the package @done(24-06-25 14:38)
   ☐ Check the refresh button
   ☐ Check the stop btn
-  ☐ write readme
+  ☐ Write readme
+  ☐ Write Changelog
+  ☐ Test on linux
+  ☐ Test on windows
+  ☐ Write test cases
 
+Features:
+    ☐ Add support for creating a new test case

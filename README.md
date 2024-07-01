@@ -2,6 +2,8 @@
 
 This Visual Studio Code extension provides comprehensive support for the PEST PHP testing framework, enhancing your testing workflow within VS Code.
 
+![Screenshot](./assets/screenshot.gif)
+
 ## Features
 
 This extension introduces several powerful features to improve your experience with PEST PHP in Visual Studio Code:

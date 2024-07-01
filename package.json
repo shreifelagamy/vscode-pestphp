@@ -1,8 +1,14 @@
 {
     "name": "vscode-pestphp",
-    "displayName": "Pest testing framework",
+    "displayName": "Pest PHP test explorer framework",
     "description": "Enable the support for the pest testing framework ",
-    "version": "0.0.1",
+    "icon": "assets/logo.png",
+    "version": "1.0.1",
+    "license": "MIT",
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/shreifelagamy/vscode-pestphp"
+    },
     "engines": {
         "vscode": "^1.85.0"
     },
@@ -10,6 +16,16 @@
         "Testing",
         "Other",
         "Debuggers"
+    ],
+    "keywords": [
+        "pest",
+        "testing",
+        "php",
+        "laravel",
+        "pestphp",
+        "tdd",
+        "unittest",
+        "unit test"
     ],
     "activationEvents": [
         "workspaceContains:**/*.php"

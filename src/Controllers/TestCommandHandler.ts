@@ -1,7 +1,6 @@
-import ansiStyles from "ansi-styles";
 import { spawn } from "child_process";
 import { TestController, TestItem, TestMessage, TestRun, TestRunRequest, WorkspaceFolder, workspace } from "vscode";
-import { EOL, ItemType, getType } from "../utils";
+import { EOL, ItemType, ansiColors, getType } from "../utils";
 
 export default class TestCommandHandler {
     private parentPaths: string[] = [];
@@ -88,7 +87,7 @@ export default class TestCommandHandler {
                                 this.runner.failed(testCase, new TestMessage(testFailedMatch[2]))
                             }
 
-                            this.runner.appendOutput(`${ansiStyles.color.red.open}⨯${ansiStyles.color.red.close} ${ansiStyles.color.gray.open}${testCase?.label}${ansiStyles.color.gray.close} ${EOL}`);
+                            this.runner.appendOutput(`${ansiColors.red.open}⨯${ansiColors.red.close} ${ansiColors.gray.open}${testCase?.label}${ansiColors.gray.close} ${EOL}`);
                         }
                         isFailed = true;
                     } else if (testSkippedMatch) {
@@ -96,7 +95,7 @@ export default class TestCommandHandler {
                         const testCase = this.queue.find(item => item.test.id == testId)?.test
                         if (testCase) {
                             this.runner.skipped(testCase)
-                            this.runner.appendOutput(`${ansiStyles.color.yellow.open}-${ansiStyles.color.yellow.close} ${ansiStyles.color.gray.open}${testCase?.label}${ansiStyles.color.gray.close}${EOL}`);
+                            this.runner.appendOutput(`${ansiColors.yellow.open}-${ansiColors.yellow.close} ${ansiColors.gray.open}${testCase?.label}${ansiColors.gray.close}${EOL}`);
                         }
                         isSkipped = true;
                     } else if (testFinishedMatch) {
@@ -105,7 +104,7 @@ export default class TestCommandHandler {
 
                         if (!isFailed && !isSkipped && testCase) {
                             this.runner.passed(testCase)
-                            this.runner.appendOutput(`${ansiStyles.color.green.open}✓${ansiStyles.color.green.close} ${ansiStyles.color.gray.open}${testCase?.label}${ansiStyles.color.gray.close}${EOL}`);
+                            this.runner.appendOutput(`${ansiColors.green.open}✓${ansiColors.green.close} ${ansiColors.gray.open}${testCase?.label}${ansiColors.gray.close}${EOL}`);
                         }
 
                         isFailed = false;

@@ -5,6 +5,7 @@
     "icon": "assets/logo.png",
     "version": "1.0.1",
     "license": "MIT",
+    "publisher": "shashraf",
     "repository": {
         "type": "git",
         "url": "https://github.com/shreifelagamy/vscode-pestphp"
@@ -59,7 +60,6 @@
         "webpack-cli": "^5.1.4"
     },
     "dependencies": {
-        "ansi-styles": "^6.2.1",
         "php-parser": "^3.1.5"
     }
 }

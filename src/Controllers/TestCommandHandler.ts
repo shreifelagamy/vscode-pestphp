@@ -1,17 +1,25 @@
 import { spawn } from "child_process";
 import { TestController, TestItem, TestMessage, TestRun, TestRunRequest, WorkspaceFolder, workspace } from "vscode";
-import { EOL, ItemType, ansiColors, getType } from "../utils";
+import { ItemType, getType } from "../utils";
+import TestOutputHandler from "./TestOutputHandler";
 
+type regexPatternKeys = 'testSuitePattern' | 'testSuiteFinishedPattern' | 'testStartedPattern' | 'testDatasetStartedPattern' | 'testFailedPattern' | 'testFinishedPattern' | 'testSkippedPattern';
 export default class TestCommandHandler {
     private parentPaths: string[] = [];
     private testCases: string[] = [];
     private workspace: WorkspaceFolder[] = [];
-    private testSuitePattern = /##teamcity\[testSuiteStarted\s+name='([^']+)'/;
-    private testSuiteFinishedPattern = /##teamcity\[testSuiteFinished\s+name='([^']+)'/;
-    private testStartedPattern = /##teamcity\[testStarted\s+name='([^']+)'/;
-    private testFailedPattern = /##teamcity\[testFailed\s+name='([^']+)'\s+message='([^']+)'/;
-    private testFinishedPattern = /##teamcity\[testFinished\s+name='([^']+)'/;
-    private testSkippedPattern = /##teamcity\[testIgnored\s+name='([^']+)'\s+message='([^']+)/;
+
+    private regexPatterns: {
+        [key in regexPatternKeys]: RegExp
+    } = {
+            testSuitePattern: /##teamcity\[testSuiteStarted\s+name='([^']+)'/,
+            testSuiteFinishedPattern: /##teamcity\[testSuiteFinished\s+name='([^']+)'/,
+            testStartedPattern: /##teamcity\[testStarted\s+name='([^']+)'/,
+            testDatasetStartedPattern: /##teamcity\[testStarted name='(.*?) with data set/,
+            testFailedPattern: /##teamcity\[testFailed\s+name='([^']+)'\s+message='([^']+)'/,
+            testFinishedPattern: /##teamcity\[testFinished\s+name='([^']+)'/,
+            testSkippedPattern: /##teamcity\[testIgnored\s+name='([^']+)'\s+message='([^']+)/,
+        };
 
     constructor(private request: TestRunRequest, private controller: TestController, private runner: TestRun, private queue: { test: TestItem }[] = []) {
     }
@@ -39,14 +47,10 @@ export default class TestCommandHandler {
 
     private runCommand() {
         const args = this.prepareArgs();
+        const testOutputHandler = new TestOutputHandler(this.runner, this.queue);
 
         this.workspace.forEach(workspaceFolder => {
             const command = spawn('vendor/bin/pest', args, { cwd: workspaceFolder.uri.path });
-
-            let suiteName = '';
-            let isFailed = false;
-            let isSkipped = false;
-            let testSuitedStarted = false
 
             command.stdout.on('data', (data) => {
                 const output = data.toString();
@@ -55,62 +59,20 @@ export default class TestCommandHandler {
                 while (lines.length > 1) {
                     const line: string = lines.shift();
 
-                    let testSuiteMatch = line.match(this.testSuitePattern);
-                    let testStartedMatch = line.match(this.testStartedPattern);
-                    let testFailedMatch = line.match(this.testFailedPattern);
-                    let testFinishedMatch = line.match(this.testFinishedPattern);
-                    let testSkippedMatch = line.match(this.testSkippedPattern);
-                    let testSuiteFinishedMatch = line.match(this.testSuiteFinishedPattern);
+                    let matchExp = this.matchExperssions(line);
 
-                    if (testSuiteMatch) {
-                        suiteName = testSuiteMatch[1];
-                    } else if (testStartedMatch) {
-                        if (!testSuitedStarted) {
-                            this.runner.appendOutput(`${EOL}${suiteName}${EOL}`);
-                        }
-
-                        testSuitedStarted = true;
-
-                        const testId = `${suiteName}::${testStartedMatch[1].replace(/ /g, '_').replace(/-/g, '_')}`;
-                        const testCase = this.queue.find(item => item.test.id == testId)?.test
-                        if (testCase) {
-                            this.runner.started(testCase)
-                        }
-                    } else if (testFailedMatch) {
-                        const testId = `${suiteName}::${testFailedMatch[1].replace(/ /g, '_').replace(/-/g, '_')}`;
-                        const testCase = this.queue.find(item => item.test.id == testId)?.test
-
-                        if (testCase) {
-                            if (testFailedMatch[2].includes('Exception')) {
-                                this.runner.errored(testCase, new TestMessage(testFailedMatch[2].split('\n')[0]))
-                            } else {
-                                this.runner.failed(testCase, new TestMessage(testFailedMatch[2]))
-                            }
-
-                            this.runner.appendOutput(`${ansiColors.red.open}⨯${ansiColors.red.close} ${ansiColors.gray.open}${testCase?.label}${ansiColors.gray.close} ${EOL}`);
-                        }
-                        isFailed = true;
-                    } else if (testSkippedMatch) {
-                        const testId = `${suiteName}::${testSkippedMatch[1].replace(/ /g, '_').replace(/-/g, '_')}`;
-                        const testCase = this.queue.find(item => item.test.id == testId)?.test
-                        if (testCase) {
-                            this.runner.skipped(testCase)
-                            this.runner.appendOutput(`${ansiColors.yellow.open}-${ansiColors.yellow.close} ${ansiColors.gray.open}${testCase?.label}${ansiColors.gray.close}${EOL}`);
-                        }
-                        isSkipped = true;
-                    } else if (testFinishedMatch) {
-                        const testId = `${suiteName}::${testFinishedMatch[1].replace(/ /g, '_').replace(/-/g, '_')}`;
-                        const testCase = this.queue.find(item => item.test.id == testId)?.test
-
-                        if (!isFailed && !isSkipped && testCase) {
-                            this.runner.passed(testCase)
-                            this.runner.appendOutput(`${ansiColors.green.open}✓${ansiColors.green.close} ${ansiColors.gray.open}${testCase?.label}${ansiColors.gray.close}${EOL}`);
-                        }
-
-                        isFailed = false;
-                        isSkipped = false;
-                    } else if (testSuiteFinishedMatch) {
-                        testSuitedStarted = false;
+                    if (matchExp.testSuitePattern) {
+                        testOutputHandler.suiteStarted(matchExp.testSuitePattern);
+                    } else if (matchExp.testStartedPattern) {
+                        testOutputHandler.testStarted(matchExp.testStartedPattern, matchExp.testDatasetStartedPattern!);
+                    } else if (matchExp.testFailedPattern) {
+                        testOutputHandler.testFailed(matchExp.testFailedPattern)
+                    } else if (matchExp.testSkippedPattern) {
+                        testOutputHandler.testSkipped(matchExp.testSkippedPattern)
+                    } else if(matchExp.testFinishedPattern) {
+                        testOutputHandler.testFinished(matchExp.testFinishedPattern)
+                    } else if (matchExp.testSuiteFinishedPattern) {
+                        testOutputHandler.suiteFinished(matchExp.testSuiteFinishedPattern)
                     }
                 }
             });
@@ -135,5 +97,26 @@ export default class TestCommandHandler {
         }
 
         return args
+    }
+
+    private matchExperssions(line: string): { [key in regexPatternKeys]: RegExpMatchArray | null } {
+        let output: { [key in regexPatternKeys]: RegExpMatchArray | null } = {
+            testSuitePattern: null,
+            testSuiteFinishedPattern: null,
+            testStartedPattern: null,
+            testDatasetStartedPattern: null,
+            testFailedPattern: null,
+            testFinishedPattern: null,
+            testSkippedPattern: null
+        };
+
+        Object.keys(this.regexPatterns).forEach(key => {
+            const match = line.match(this.regexPatterns[key as regexPatternKeys]);
+            if (match) {
+                output[key as regexPatternKeys] = match;
+            }
+        });
+
+        return output;
     }
 }

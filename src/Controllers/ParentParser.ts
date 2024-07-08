@@ -27,7 +27,16 @@ export default class ParentParser {
     }
 
     async resolveTestParent(workspaceFolder: vscode.WorkspaceFolder, file?: vscode.Uri) {
-        const output = cp.execSync(`./vendor/bin/pest ${file?.path ?? ''} --list-tests`, { cwd: workspaceFolder.uri.path });
+        let output
+        try {
+            output = cp.execSync(`./vendor/bin/pest ${file?.path ?? ''} --list-tests`, { cwd: workspaceFolder.uri.path });
+        } catch (error) {
+            if (error instanceof Error) {
+                vscode.window.showErrorMessage(error.message);
+            }
+            return;
+        }
+
         const lines = output.toString().split('\n');
         const classNamesWithTests = await lines.filter(line => line.startsWith(' - P')).map(line => line.replace(' - P\\', '').replace('__pest_evaluable_', ''));
         let classNames: String[] = [];

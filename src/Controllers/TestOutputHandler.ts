@@ -7,6 +7,7 @@ export default class TestOutputHandler {
         name: string,
         started: boolean,
         failed: boolean,
+        skipped: boolean,
         errored: boolean,
         failedMessages: TestMessage[],
         runningCase: {
@@ -34,6 +35,7 @@ export default class TestOutputHandler {
             name: '',
             started: false,
             failed: false,
+            skipped: false,
             errored: false,
             failedMessages: [],
             runningCase: {
@@ -132,6 +134,14 @@ export default class TestOutputHandler {
     }
 
     testSkipped(skippedMatch: RegExpMatchArray) {
+        if(this.testDataSet.started) {
+            this.testDataSet.skipped = true;
+
+            this.runner.appendOutput(`${ansiColors.yellow.open}-${ansiColors.yellow.close} ${ansiColors.gray.open}${this.testDataSet.runningCase.name}${ansiColors.gray.close}${EOL}`);
+
+            return;
+        }
+
         if (this.runningTestCase.item != null) {
             const testCase = this.runningTestCase.item;
 
@@ -145,7 +155,7 @@ export default class TestOutputHandler {
 
     testFinished(finishedMatch: RegExpMatchArray) {
         if (this.testDataSet.started) {
-            if (!this.testDataSet.runningCase.failed) {
+            if (this.testDataSet.runningCase.failed == false && this.testDataSet.skipped == false) {
                 this.runner.appendOutput(`${ansiColors.green.open}✓${ansiColors.green.close} ${ansiColors.gray.open}${this.testDataSet.runningCase.name}${ansiColors.gray.close}${EOL}`);
             }
 
@@ -175,8 +185,9 @@ export default class TestOutputHandler {
     suiteFinished(finishedMatch: RegExpMatchArray) {
         if (this.testDataSet.started) {
             if (this.testDataSet.failed) {
-                console.log(finishedMatch, this.testDataSet, this.testDataSet.testItem);
                 this.runner.failed(this.testDataSet.testItem!, this.testDataSet.failedMessages!);
+            } else if(this.testDataSet.skipped) {
+                this.runner.skipped(this.testDataSet.testItem!);
             } else {
                 this.runner.passed(this.testDataSet.testItem!);
             }
@@ -186,6 +197,7 @@ export default class TestOutputHandler {
                 name: '',
                 started: false,
                 failed: false,
+                skipped: false,
                 errored: false,
                 failedMessages: [],
                 runningCase: {

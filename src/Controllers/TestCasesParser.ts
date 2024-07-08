@@ -1,4 +1,4 @@
-import { Call, Engine, ExpressionStatement, Location, Node, Program, PropertyLookup, String } from 'php-parser';
+import { Call, Engine, ExpressionStatement, Location, Node, Program, String } from 'php-parser';
 import * as vscode from 'vscode';
 import { Info, ItemType, getType, testData } from '../utils';
 
@@ -50,12 +50,21 @@ export default class TestCasesParser {
             if (exp.what) {
                 switch (exp.what.kind) {
                     case 'propertylookup':
-                        const what = (exp.what as unknown as PropertyLookup).what as Call;
-                        testCases.push({ name: (what.arguments[0] as String).value, loc: (what.arguments[0] as String).loc, methodName: what.what.name as string })
+                        let getTestCase = function (method: Call) {
+                            if (method.what.kind == 'call' && method.what.what.kind == 'name') {
+                                let methodDetials = method.what as Call
+
+                                testCases.push({ name: (methodDetials.arguments[0] as String).value, loc: (methodDetials.arguments[0] as String).loc, methodName: methodDetials.what.name as string })
+                            } else {
+                                getTestCase(method.what as Call)
+                            }
+                        }
+
+                        getTestCase(exp.what as unknown as Call)
                         break;
 
                     case 'name':
-                        if (exp.what.name != 'beforeEach') {
+                        if (['it', 'test'].includes(exp.what.name as string)) {
                             const args = exp.arguments[0] as String;
                             testCases.push({ name: args.value, loc: args.loc, methodName: exp.what.name as string })
                         }

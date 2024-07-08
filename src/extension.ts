@@ -20,7 +20,7 @@ export async function activate(context: vscode.ExtensionContext) {
     }
 
 
-    if(!pestInstalled) {
+    if (!pestInstalled) {
         return;
     }
 
@@ -31,7 +31,11 @@ export async function activate(context: vscode.ExtensionContext) {
     const testCasesParser = new TestCasesParser(controller);
     const runner = new TestRunner(controller);
 
-    parentParser.discover()
+    controller.resolveHandler = (test) => {
+        if (test == undefined) {
+            parentParser.discover()
+        }
+    }
 
     controller.createRunProfile(
         'Run',

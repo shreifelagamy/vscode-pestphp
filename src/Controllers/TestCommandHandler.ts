@@ -19,6 +19,7 @@ export default class TestCommandHandler {
             testFailedPattern: /##teamcity\[testFailed\s+name='([^']+)'\s+message='([^']+)'/,
             testFinishedPattern: /##teamcity\[testFinished\s+name='([^']+)'/,
             testSkippedPattern: /##teamcity\[testIgnored\s+name='([^']+)'\s+message='([^']+)/,
+            testDatasetSkippedPattern: /##teamcity\[testIgnored\s+name='(.*?) with data set/,
         };
 
     constructor(private request: TestRunRequest, private controller: TestController, private runner: TestRun, private queue: { test: TestItem }[] = []) {

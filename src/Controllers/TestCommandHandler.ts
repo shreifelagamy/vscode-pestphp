@@ -3,7 +3,7 @@ import { TestController, TestItem, TestMessage, TestRun, TestRunRequest, Workspa
 import { ItemType, getType } from "../utils";
 import TestOutputHandler from "./TestOutputHandler";
 
-type regexPatternKeys = 'testSuitePattern' | 'testSuiteFinishedPattern' | 'testStartedPattern' | 'testDatasetStartedPattern' | 'testFailedPattern' | 'testFinishedPattern' | 'testSkippedPattern';
+type regexPatternKeys = 'testSuitePattern' | 'testSuiteFinishedPattern' | 'testStartedPattern' | 'testDatasetStartedPattern' | 'testFailedPattern' | 'testFinishedPattern' | 'testSkippedPattern' | 'testDatasetSkippedPattern';
 export default class TestCommandHandler {
     private parentPaths: string[] = [];
     private testCases: string[] = [];
@@ -108,7 +108,8 @@ export default class TestCommandHandler {
             testDatasetStartedPattern: null,
             testFailedPattern: null,
             testFinishedPattern: null,
-            testSkippedPattern: null
+            testSkippedPattern: null,
+            testDatasetSkippedPattern: null
         };
 
         Object.keys(this.regexPatterns).forEach(key => {

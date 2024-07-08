@@ -51,12 +51,12 @@ export default class TestCasesParser {
                 switch (exp.what.kind) {
                     case 'propertylookup':
                         let getTestCase = function (method: Call) {
-                            if (method.what.kind == 'call' && method.what.what.kind == 'name') {
-                                let methodDetials = method.what as Call
+                            if (method.what.kind == 'call' && (method.what as unknown as Call).what.kind == 'name') {
+                                let methodDetials = method.what as unknown as Call
 
                                 testCases.push({ name: (methodDetials.arguments[0] as String).value, loc: (methodDetials.arguments[0] as String).loc, methodName: methodDetials.what.name as string })
                             } else {
-                                getTestCase(method.what as Call)
+                                getTestCase(method.what as unknown as Call)
                             }
                         }
 

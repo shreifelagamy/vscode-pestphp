@@ -3,7 +3,7 @@
     "displayName": "Pest PHP test explorer framework",
     "description": "Enable the support for the pest testing framework ",
     "icon": "assets/logo.png",
-    "version": "1.0.1",
+    "version": "1.1.0",
     "license": "MIT",
     "publisher": "shashraf",
     "repository": {

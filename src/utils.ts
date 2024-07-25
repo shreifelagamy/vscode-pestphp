@@ -7,13 +7,14 @@ export enum ItemType {
 export interface Info {
     workspaceFolder: vscode.WorkspaceFolder;
     caseType: ItemType.File | ItemType.TestCase;
-    parentPath: vscode.Uri | undefined;
     testId: string;
     testItem: vscode.TestItem;
+    fileUrl: string;
+    filePath: string;
 };
 
 export const testData = new WeakMap<vscode.TestItem, Info>();
-export const getType = (testItem: vscode.TestItem) => testData.get(testItem)!;
+export const getTestInfo = (testItem: vscode.TestItem): Info => testData.get(testItem)!;
 export const EOL: string = '\r\n';
 
 export const ansiColors = {

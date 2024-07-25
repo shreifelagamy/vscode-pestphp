@@ -1,5 +1,7 @@
 import * as cp from 'child_process';
+import * as path from 'path';
 import * as vscode from 'vscode';
+import { default as configs } from '../configs';
 import { Info, ItemType, testData } from '../utils';
 import TestCasesParser from './TestCasesParser';
 
@@ -26,10 +28,13 @@ export default class ParentParser {
         );
     }
 
-    async resolveTestParent(workspaceFolder: vscode.WorkspaceFolder, file?: vscode.Uri) {
+    async resolveTestParent(workspaceFolder: vscode.WorkspaceFolder, fileUrl?: string) {
         let output
+
+        const cmd = this.prepareCommand(fileUrl);
+
         try {
-            output = cp.execSync(`./vendor/bin/pest ${file?.path ?? ''} --list-tests`, { cwd: workspaceFolder.uri.path });
+            output = cp.execSync(`${cmd}`, { cwd: workspaceFolder.uri.path });
         } catch (error) {
             if (error instanceof Error) {
                 vscode.window.showErrorMessage(error.message);
@@ -46,7 +51,7 @@ export default class ParentParser {
 
             if (!classNames.includes(theClassName)) {
                 const testPath = theClassName.replaceAll('\\', '/').replace('Tests/', 'tests/');
-                const fileUrl = `${workspaceFolder.uri.path}/${testPath}.php`;
+                const fileUrl = `${testPath}.php`;
                 const uri = vscode.Uri.file(fileUrl)
                 const ParentTestItem = this.controller.createTestItem(theClassName, theClassName, uri);
                 ParentTestItem.canResolveChildren = true;
@@ -54,9 +59,10 @@ export default class ParentParser {
                 let info: Info = {
                     workspaceFolder: workspaceFolder,
                     caseType: ItemType.File,
-                    parentPath: undefined,
                     testId: theClassName,
                     testItem: ParentTestItem,
+                    fileUrl: `${workspaceFolder.uri.path}/${testPath}.php`,
+                    filePath: fileUrl
                 }
 
                 testData.set(ParentTestItem, info);
@@ -66,19 +72,33 @@ export default class ParentParser {
         });
     }
 
+    private prepareCommand(fileUrl?: string): string {
+        let command: string = '';
+
+        if (configs.isDockerEnabled) {
+            command += `docker exec ${configs.dockerConatinerName} `;
+        }
+
+        command += `${configs.path} ${fileUrl ?? ''} --list-tests`;
+
+        return command;
+    }
+
     async startWatching(pattern: vscode.RelativePattern, exclude: vscode.RelativePattern) {
         const watcher = vscode.workspace.createFileSystemWatcher(pattern);
 
         watcher.onDidCreate(uri => {
             const workspaceFolder = vscode.workspace.getWorkspaceFolder(uri);
-            if (workspaceFolder)
-                this.resolveTestParent(workspaceFolder, uri);
+            if (workspaceFolder) {
+                const fileUrl = path.relative(workspaceFolder.uri.fsPath, uri.fsPath)
+                this.resolveTestParent(workspaceFolder, fileUrl);
+            }
         });
 
         watcher.onDidChange(async uri => {
             let parentTestItem: vscode.TestItem | undefined;
             await this.controller.items.forEach(item => {
-                if (item.uri?.path == uri.path) {
+                if (uri.path?.indexOf(item.uri?.path!) > 0) {
                     parentTestItem = item;
                     return;
                 }
@@ -91,10 +111,11 @@ export default class ParentParser {
 
         watcher.onDidDelete(async uri => {
             let parentTestItem: vscode.TestItem | undefined;
+            const workspaceFolder = vscode.workspace.getWorkspaceFolder(uri)!;
 
             // Find the parent test item to delete
             await this.controller.items.forEach(item => {
-                if (item.uri?.path == uri.path) {
+                if (uri.path!.indexOf(item.uri?.path!) > 0) {
                     parentTestItem = item;
                     return; // Exit the loop once the item is found
                 }

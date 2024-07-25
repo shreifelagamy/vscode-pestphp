@@ -1,6 +1,6 @@
 import { Call, Engine, ExpressionStatement, Location, Node, Program, String } from 'php-parser';
 import * as vscode from 'vscode';
-import { Info, ItemType, getType, testData } from '../utils';
+import { Info, ItemType, getTestInfo, testData } from '../utils';
 
 export default class TestCasesParser {
     constructor(private controller: vscode.TestController) {
@@ -11,10 +11,10 @@ export default class TestCasesParser {
             return;
         }
 
-        const uri = vscode.Uri.file(test.uri?.path)
+        const parentTest = getTestInfo(test);
+        const uri = vscode.Uri.file(parentTest.fileUrl)
         const rawContent = await vscode.workspace.fs.readFile(uri);
         const content = new TextDecoder().decode(rawContent);
-        const parentTest = getType(test);
         const parser = new Engine({
             // some options :
             parser: {
@@ -92,9 +92,10 @@ export default class TestCasesParser {
             let info: Info = {
                 workspaceFolder: parentTest.workspaceFolder,
                 caseType: ItemType.TestCase,
-                parentPath: uri,
                 testId: testItemId,
                 testItem: childTestItem,
+                fileUrl: parentTest.fileUrl,
+                filePath: parentTest.filePath
             }
 
             testData.set(childTestItem, info);

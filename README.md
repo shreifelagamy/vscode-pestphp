@@ -16,6 +16,22 @@ These features are designed to streamline your testing process, making it more e
 
 > **Note**: This is the first release of the extension, focusing on core functionalities to enhance your PEST PHP testing. Future updates will aim to expand features and improve user experience.
 
+## Configuration
+
+You can configure the extension to use Docker and update the PEST PHP path. The configuration is in JSON format with the following keys:
+
+- `pestphp.docker.container_name`: The name of the Docker container where PEST PHP is installed.
+- `pestphp.path`: The path to the PEST PHP executable.
+
+Example configuration in your `settings.json`:
+
+```json
+{
+    "pestphp.docker.container_name": "my_docker_container",
+    "pestphp.path": "/path/to/pest"
+}
+```
+
 ## Supported OS
 
 This extension has been tested and confirmed to work on the following operating systems:

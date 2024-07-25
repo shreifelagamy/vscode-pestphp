@@ -32,7 +32,23 @@
         "workspaceContains:**/*.php"
     ],
     "main": "./dist/extension.js",
-    "contributes": {},
+    "contributes": {
+        "configuration":{
+            "title": "Pest PHP test framework",
+            "properties": {
+                "pestphp.docker.container_name": {
+                    "type": ["string", "null"],
+                    "default": null,
+                    "description": "Docker container name to be used to run the command inside ."
+                },
+                "pestphp.path": {
+                    "type": "string",
+                    "default": "./vendor/bin/pest",
+                    "description": "Custom path to run the command. Ex: `vendor/bin/pest`."
+                }
+            }
+        }
+    },
     "scripts": {
         "vscode:prepublish": "yarn run package",
         "compile": "webpack",

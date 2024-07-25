@@ -1,7 +1,6 @@
-import { spawn, spawnSync } from 'child_process';
 import * as vscode from 'vscode';
-import { getType } from '../utils';
 import TestCommandHandler from './TestCommandHandler';
+import { loadConfigs } from '../configs';
 
 export default class TestRunner {
     protected queue: { test: vscode.TestItem }[] = [];
@@ -39,6 +38,8 @@ export default class TestRunner {
     }
 
     async run(shouldDebug: boolean, request: vscode.TestRunRequest, token: vscode.CancellationToken) {
+        loadConfigs();
+        
         const runner = this.controller.createTestRun(request)
         const testItems = request.include ? request.include : this.controller.items;
 

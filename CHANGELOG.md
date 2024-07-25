@@ -11,3 +11,8 @@
 - Support data set test cases.
 - Showing errors in the test explorer
 - enhance code and perfomance
+
+## 1.2.0
+
+- Added support for Docker.
+- Added the ability to customize the path for test cases.

@@ -1,6 +1,7 @@
 import { spawn } from "child_process";
-import { TestController, TestItem, TestMessage, TestRun, TestRunRequest, WorkspaceFolder, workspace } from "vscode";
-import { ItemType, getType } from "../utils";
+import { TestController, TestItem, TestRun, TestRunRequest, WorkspaceFolder, workspace } from "vscode";
+import { default as configs } from "../configs";
+import { EOL, ItemType, getTestInfo } from "../utils";
 import TestOutputHandler from "./TestOutputHandler";
 
 type regexPatternKeys = 'testSuitePattern' | 'testSuiteFinishedPattern' | 'testStartedPattern' | 'testDatasetStartedPattern' | 'testFailedPattern' | 'testFinishedPattern' | 'testSkippedPattern' | 'testDatasetSkippedPattern';
@@ -28,12 +29,12 @@ export default class TestCommandHandler {
     run() {
         if (this.request.include?.length) {
             this.request.include.forEach(testItem => {
-                const info = getType(testItem);
+                const info = getTestInfo(testItem);
 
                 if (info.caseType == ItemType.File) {
-                    this.parentPaths.push(testItem.uri!.path)
+                    this.parentPaths.push(info.filePath)
                 } else if (info.caseType == ItemType.TestCase) {
-                    this.parentPaths.push(testItem.parent!.uri!.path)
+                    this.parentPaths.push(info.filePath)
                     this.testCases.push(testItem.label)
                 }
 
@@ -47,11 +48,12 @@ export default class TestCommandHandler {
     }
 
     private runCommand() {
-        const args = this.prepareArgs();
+        const [cmdPrefix, ...args] = this.prepareCommand();
         const testOutputHandler = new TestOutputHandler(this.runner, this.queue);
 
         this.workspace.forEach(workspaceFolder => {
-            const command = spawn('vendor/bin/pest', args, { cwd: workspaceFolder.uri.path });
+            const command = spawn(cmdPrefix, args, { cwd: workspaceFolder.uri.path });
+            this.runner.appendOutput(`🚀 ${command.spawnargs.filter(value => value !== '--teamcity' && value !== '--colors=never').join(' ')}${EOL}`);
 
             command.stdout.on('data', (data) => {
                 const output = data.toString();
@@ -70,20 +72,26 @@ export default class TestCommandHandler {
                         testOutputHandler.testFailed(matchExp.testFailedPattern)
                     } else if (matchExp.testSkippedPattern) {
                         testOutputHandler.testSkipped(matchExp.testSkippedPattern)
-                    } else if(matchExp.testFinishedPattern) {
+                    } else if (matchExp.testFinishedPattern) {
                         testOutputHandler.testFinished(matchExp.testFinishedPattern)
                     } else if (matchExp.testSuiteFinishedPattern) {
                         testOutputHandler.suiteFinished(matchExp.testSuiteFinishedPattern)
                     }
                 }
             });
-
+            
             command.stdout.on('end', () => { this.runner.end() });
         })
     }
 
-    private prepareArgs(): string[] {
+    private prepareCommand(): string[] {
         let args: string[] = [];
+
+        if (configs.isDockerEnabled) {
+            args.push('docker', 'exec', configs.dockerConatinerName);
+        }
+
+        args.push(configs.path);
 
         if (this.parentPaths.length) {
             this.parentPaths.forEach(path => args.push(path));
@@ -94,7 +102,7 @@ export default class TestCommandHandler {
 
         if (this.testCases.length) {
             args.push('--filter')
-            this.testCases.forEach(testCase => args.push(`${testCase}`))
+            this.testCases.forEach(testCase => args.push(`'${testCase}'`))
         }
 
         return args

@@ -3,8 +3,8 @@ import * as vscode from 'vscode';
 import ParentParser from './Controllers/ParentParser';
 import TestCasesParser from './Controllers/TestCasesParser';
 import TestRunner from './Controllers/TestRunner';
+import { loadConfigs } from './configs';
 
-// TODO: get composer to check if pest is downloaded
 export async function activate(context: vscode.ExtensionContext) {
     let pestInstalled = false;
 
@@ -19,7 +19,6 @@ export async function activate(context: vscode.ExtensionContext) {
         }
     }
 
-
     if (!pestInstalled) {
         return;
     }
@@ -30,6 +29,8 @@ export async function activate(context: vscode.ExtensionContext) {
     const parentParser = new ParentParser(controller, context);
     const testCasesParser = new TestCasesParser(controller);
     const runner = new TestRunner(controller);
+
+    loadConfigs();
 
     controller.resolveHandler = (test) => {
         if (test == undefined) {

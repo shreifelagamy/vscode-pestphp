@@ -33,8 +33,20 @@ export default class ParentParser {
 
         const cmd = this.prepareCommand(fileUrl);
 
+        const windowsOS = process.platform === 'win32';
+
+        let currentWorkingDirectory = workspaceFolder.uri.path
+
+        if (windowsOS) {
+            currentWorkingDirectory = workspaceFolder.uri.path
+            .replace(/^\/([a-zA-Z]):/, '$1:\\') // Convert to Windows path format
+            .replace(/\//g, '\\'); // Replace forward slashes with backslashes
+        }
+
+        const runningCommand = windowsOS ? `wsl ${cmd}` : `${cmd}`
+
         try {
-            output = cp.execSync(`${cmd}`, { cwd: workspaceFolder.uri.path });
+            output = cp.execSync(runningCommand, { cwd: currentWorkingDirectory });
         } catch (error) {
             if (error instanceof Error) {
                 vscode.window.showErrorMessage(error.message);

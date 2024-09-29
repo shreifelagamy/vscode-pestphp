@@ -51,8 +51,21 @@ export default class TestCommandHandler {
         const [cmdPrefix, ...args] = this.prepareCommand();
         const testOutputHandler = new TestOutputHandler(this.runner, this.queue);
 
+        const windowsOS = process.platform === 'win32';
+
+        const finalCmdPrefix = windowsOS ? 'wsl' : cmdPrefix;
+        const finalArgs = windowsOS ? [cmdPrefix, ...args] : args;
+
         this.workspace.forEach(workspaceFolder => {
-            const command = spawn(cmdPrefix, args, { cwd: workspaceFolder.uri.path });
+            let currentWorkingDirectory = workspaceFolder.uri.path;
+
+            if (windowsOS) {
+                currentWorkingDirectory = workspaceFolder.uri.path
+                .replace(/^\/([a-zA-Z]):/, '$1:\\')
+                .replace(/\//g, '\\');
+            }
+
+            const command = spawn(finalCmdPrefix, finalArgs, { cwd: currentWorkingDirectory });
             this.runner.appendOutput(`🚀 ${command.spawnargs.filter(value => value !== '--teamcity' && value !== '--colors=never').join(' ')}${EOL}`);
 
             command.stdout.on('data', (data) => {

@@ -60,14 +60,7 @@
                     "description": "Custom path to run the command. Ex: `vendor/bin/pest`."
                 }
             }
-        },
-        "commands": [
-            {
-                "command": "pestphp.mytest",
-                "title": "Pest PHP: My Test Command",
-                "category": "Pest PHP"
-            }
-        ]
+        }
     },
     "scripts": {
         "vscode:prepublish": "yarn run package",

@@ -33,6 +33,16 @@ Example configuration in your `settings.json`:
 }
 ```
 
+## Example Using With wp-env
+
+An example of usign WordPress's wp-env:
+```json
+{
+    "pestphp.docker.enabled": true,
+    "pestphp.docker.command": "wp-env run tests-cli --env-cwd=wp-content/plugins/my-test-plugin"
+}
+```
+
 ## Supported OS
 
 This extension has been tested and confirmed to work on the following operating systems:

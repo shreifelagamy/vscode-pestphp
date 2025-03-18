@@ -66,7 +66,7 @@ export default class TestCommandHandler {
                 .replace(/\//g, '\\');
             }
 
-            // 'spawn' did not work. Needed 'exec'. Likely needed a shell
+            // 'spawn' was resulting in the error 'Command failed with exit code 126', using exec resolved the issue.
             const command = cp.exec(finalCmdPrefix + ' ' + finalArgs.join(' '), { cwd: currentWorkingDirectory });
             this.runner.appendOutput(`🚀 ${command.spawnargs.join(' ')}${EOL}`);
 

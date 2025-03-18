@@ -1,4 +1,5 @@
-import { spawn } from "child_process";
+// import { spawn } from "child_process";
+import * as cp from 'child_process';
 import { TestController, TestItem, TestRun, TestRunRequest, WorkspaceFolder, workspace } from "vscode";
 import { default as configs } from "../configs";
 import { EOL, ItemType, getTestInfo } from "../utils";
@@ -65,10 +66,11 @@ export default class TestCommandHandler {
                 .replace(/\//g, '\\');
             }
 
-            const command = spawn(finalCmdPrefix, finalArgs, { cwd: currentWorkingDirectory });
-            this.runner.appendOutput(`🚀 ${command.spawnargs.filter(value => value !== '--teamcity' && value !== '--colors=never').join(' ')}${EOL}`);
+            // 'spawn' did not work. Needed 'exec'. Likely needed a shell
+            const command = cp.exec(finalCmdPrefix + ' ' + finalArgs.join(' '), { cwd: currentWorkingDirectory });
+            this.runner.appendOutput(`🚀 ${command.spawnargs.join(' ')}${EOL}`);
 
-            command.stdout.on('data', (data) => {
+            command.stdout?.on('data', (data) => {
                 const output = data.toString();
                 const lines = output.split(/\r\n|\n/);
 
@@ -92,8 +94,20 @@ export default class TestCommandHandler {
                     }
                 }
             });
-            
-            command.stdout.on('end', () => { this.runner.end() });
+
+            command.stderr?.on('data', (data) => {
+                const output = data.toString();
+                const lines = output.split(/\r\n|\n/);
+
+                while (lines.length > 1) {
+                    const line: string = lines.shift();
+                    this.runner.appendOutput(`${line}${EOL}`);
+                }
+            });
+
+            command.stdout?.on('end', () => {
+                this.runner.end();
+            });
         })
     }
 
@@ -101,7 +115,8 @@ export default class TestCommandHandler {
         let args: string[] = [];
 
         if (configs.isDockerEnabled) {
-            args.push('docker', 'exec', configs.dockerConatinerName);
+            const dockerCommand = configs.dockerCommand.split(' ');
+            args.push(...dockerCommand, configs.dockerConatinerName);
         }
 
         args.push(configs.path);
@@ -110,15 +125,15 @@ export default class TestCommandHandler {
             this.parentPaths.forEach(path => args.push(path));
         }
 
-        args.push('--teamcity')
-        args.push('--colors=never')
+        args.push('--teamcity');
+        args.push('--colors=never');
 
         if (this.testCases.length) {
-            args.push('--filter')
-            this.testCases.forEach(testCase => args.push(`'${testCase}'`))
+            args.push('--filter');
+            this.testCases.forEach(testCase => args.push(`'${testCase}'`));
         }
 
-        return args
+        return args;
     }
 
     private matchExperssions(line: string): { [key in regexPatternKeys]: RegExpMatchArray | null } {

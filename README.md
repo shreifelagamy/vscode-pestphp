@@ -20,6 +20,7 @@ These features are designed to streamline your testing process, making it more e
 
 You can configure the extension to use Docker and update the PEST PHP path. The configuration is in JSON format with the following keys:
 
+- `pestphp.docker.command`: Docker command to be used to run the command inside. Default is `docker exec`.
 - `pestphp.docker.container_name`: The name of the Docker container where PEST PHP is installed.
 - `pestphp.path`: The path to the PEST PHP executable.
 

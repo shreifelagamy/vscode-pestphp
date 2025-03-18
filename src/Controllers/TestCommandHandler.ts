@@ -1,4 +1,3 @@
-// import { spawn } from "child_process";
 import * as cp from 'child_process';
 import { TestController, TestItem, TestRun, TestRunRequest, WorkspaceFolder, workspace } from "vscode";
 import { default as configs } from "../configs";

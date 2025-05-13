@@ -20,6 +20,7 @@ These features are designed to streamline your testing process, making it more e
 
 You can configure the extension to use Docker and update the PEST PHP path. The configuration is in JSON format with the following keys:
 
+- `pestphp.docker.command`: Docker command to be used to run the command inside. Default is `docker exec`.
 - `pestphp.docker.container_name`: The name of the Docker container where PEST PHP is installed.
 - `pestphp.path`: The path to the PEST PHP executable.
 
@@ -29,6 +30,16 @@ Example configuration in your `settings.json`:
 {
     "pestphp.docker.container_name": "my_docker_container",
     "pestphp.path": "/path/to/pest"
+}
+```
+
+## Example Using With wp-env
+
+An example of usign WordPress's wp-env:
+```json
+{
+    "pestphp.docker.enabled": true,
+    "pestphp.docker.command": "wp-env run tests-cli --env-cwd=wp-content/plugins/my-test-plugin"
 }
 ```
 

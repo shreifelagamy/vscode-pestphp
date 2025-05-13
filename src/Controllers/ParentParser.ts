@@ -88,7 +88,7 @@ export default class ParentParser {
         let command: string = '';
 
         if (configs.isDockerEnabled) {
-            command += `docker exec ${configs.dockerConatinerName} `;
+            command += `${configs.dockerCommand} ${configs.dockerConatinerName} `;
         }
 
         command += `${configs.path} ${fileUrl ?? ''} --list-tests`;

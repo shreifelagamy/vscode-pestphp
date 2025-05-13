@@ -36,6 +36,16 @@
         "configuration": {
             "title": "Pest PHP test framework",
             "properties": {
+                "pestphp.docker.enabled": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "Enable Docker support."
+                },
+                "pestphp.docker.command": {
+                    "type": "string",
+                    "default": "docker exec",
+                    "description": "Docker command to be used to run the command inside."
+                },
                 "pestphp.docker.container_name": {
                     "type": [
                         "string",

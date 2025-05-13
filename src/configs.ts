@@ -4,7 +4,13 @@ let packageConfig: vscode.WorkspaceConfiguration;
 
 export default {
     get isDockerEnabled(): boolean {
-        return packageConfig.get('docker.container_name') !== undefined && packageConfig.get('docker.container_name') !== null;
+        return (packageConfig.get('docker.enabled') !== undefined
+            && packageConfig.get('docker.enabled') !== null)
+            || (packageConfig.get('docker.command') !== undefined
+                && packageConfig.get('docker.command') !== null);
+    },
+    get dockerCommand(): string {
+        return packageConfig.get('docker.command') ?? 'docker exec';
     },
     get dockerConatinerName(): string {
         return packageConfig.get('docker.container_name') ?? '';

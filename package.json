@@ -1,94 +1,99 @@
 {
-    "name": "vscode-pestphp",
-    "displayName": "Pest PHP test explorer framework",
-    "description": "Enable the support for the pest testing framework ",
-    "icon": "assets/logo.png",
-    "version": "1.4.0",
-    "license": "MIT",
-    "publisher": "shashraf",
-    "repository": {
-        "type": "git",
-        "url": "https://github.com/shreifelagamy/vscode-pestphp"
-    },
-    "engines": {
-        "vscode": "^1.85.0"
-    },
-    "categories": [
-        "Testing",
-        "Other",
-        "Debuggers"
-    ],
-    "keywords": [
-        "pest",
-        "testing",
-        "php",
-        "laravel",
-        "pestphp",
-        "tdd",
-        "unittest",
-        "unit test"
-    ],
-    "activationEvents": [
-        "workspaceContains:**/*.php"
-    ],
-    "main": "./dist/extension.js",
-    "contributes": {
-        "configuration": {
-            "title": "Pest PHP test framework",
-            "properties": {
-                "pestphp.docker.enabled": {
-                    "type": "boolean",
-                    "default": false,
-                    "description": "Enable Docker support."
-                },
-                "pestphp.docker.command": {
-                    "type": "string",
-                    "default": "docker exec",
-                    "description": "Docker command to be used to run the command inside."
-                },
-                "pestphp.docker.container_name": {
-                    "type": [
-                        "string",
-                        "null"
-                    ],
-                    "default": null,
-                    "description": "Docker container name to be used to run the command inside ."
-                },
-                "pestphp.path": {
-                    "type": "string",
-                    "default": "./vendor/bin/pest",
-                    "description": "Custom path to run the command. Ex: `vendor/bin/pest`."
-                }
-            }
-        }
-    },
-    "scripts": {
-        "vscode:prepublish": "yarn run package",
-        "compile": "webpack",
-        "watch": "webpack --watch",
-        "package": "webpack --mode production --devtool hidden-source-map",
-        "compile-tests": "tsc -p . --outDir out",
-        "watch-tests": "tsc -p . -w --outDir out",
-        "pretest": "yarn run compile-tests && yarn run compile && yarn run lint",
-        "lint": "eslint src --ext ts",
-        "test": "node ./out/test/runTest.js"
-    },
-    "devDependencies": {
-        "@types/mocha": "^10.0.3",
-        "@types/node": "18.x",
-        "@types/vscode": "^1.85.0",
-        "@typescript-eslint/eslint-plugin": "^6.9.0",
-        "@typescript-eslint/parser": "^6.9.0",
-        "@vscode/test-electron": "^2.3.6",
-        "eslint": "^8.52.0",
-        "glob": "^10.3.10",
-        "mocha": "^10.2.0",
-        "ts-loader": "^9.5.0",
-        "typescript": "^5.2.2",
-        "webpack": "^5.89.0",
-        "webpack-cli": "^5.1.4"
-    },
-    "dependencies": {
-        "php-parser": "^3.1.5"
-    }
+	"name": "vscode-pestphp",
+	"displayName": "Pest PHP test explorer framework",
+	"description": "Enable the support for the pest testing framework ",
+	"icon": "assets/logo.png",
+	"version": "1.4.0",
+	"license": "MIT",
+	"publisher": "shashraf",
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/shreifelagamy/vscode-pestphp"
+	},
+	"engines": {
+		"vscode": "^1.85.0"
+	},
+	"categories": [
+		"Testing",
+		"Other",
+		"Debuggers"
+	],
+	"keywords": [
+		"pest",
+		"testing",
+		"php",
+		"laravel",
+		"pestphp",
+		"tdd",
+		"unittest",
+		"unit test"
+	],
+	"activationEvents": [
+		"workspaceContains:**/*.php"
+	],
+	"main": "./dist/extension.js",
+	"contributes": {
+		"configuration": {
+			"title": "Pest PHP test framework",
+			"properties": {
+				"pestphp.wsl.enabled": {
+					"type": "boolean",
+					"default": true,
+					"description": "Enable WSL support."
+				},
+				"pestphp.docker.enabled": {
+					"type": "boolean",
+					"default": false,
+					"description": "Enable Docker support."
+				},
+				"pestphp.docker.command": {
+					"type": "string",
+					"default": "docker exec",
+					"description": "Docker command to be used to run the command inside."
+				},
+				"pestphp.docker.container_name": {
+					"type": [
+						"string",
+						"null"
+					],
+					"default": null,
+					"description": "Docker container name to be used to run the command inside ."
+				},
+				"pestphp.path": {
+					"type": "string",
+					"default": "./vendor/bin/pest",
+					"description": "Custom path to run the command. Ex: `vendor/bin/pest`."
+				}
+			}
+		}
+	},
+	"scripts": {
+		"vscode:prepublish": "yarn run package",
+		"compile": "webpack",
+		"watch": "webpack --watch",
+		"package": "webpack --mode production --devtool hidden-source-map",
+		"compile-tests": "tsc -p . --outDir out",
+		"watch-tests": "tsc -p . -w --outDir out",
+		"pretest": "yarn run compile-tests && yarn run compile && yarn run lint",
+		"lint": "eslint src --ext ts",
+		"test": "node ./out/test/runTest.js"
+	},
+	"devDependencies": {
+		"@types/mocha": "^10.0.3",
+		"@types/node": "18.x",
+		"@types/vscode": "^1.85.0",
+		"@typescript-eslint/eslint-plugin": "^6.9.0",
+		"@typescript-eslint/parser": "^6.9.0",
+		"@vscode/test-electron": "^2.3.6",
+		"eslint": "^8.52.0",
+		"glob": "^10.3.10",
+		"mocha": "^10.2.0",
+		"ts-loader": "^9.5.0",
+		"typescript": "^5.2.2",
+		"webpack": "^5.89.0",
+		"webpack-cli": "^5.1.4"
+	},
+	"dependencies": {
+		"php-parser": "^3.1.5"
+	}
 }

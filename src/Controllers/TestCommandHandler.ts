@@ -32,16 +32,16 @@ export default class TestCommandHandler {
                 const info = getTestInfo(testItem);
 
                 if (info.caseType == ItemType.File) {
-                    this.parentPaths.push(info.filePath)
+                    this.parentPaths.push(info.filePath);
                 } else if (info.caseType == ItemType.TestCase) {
-                    this.parentPaths.push(info.filePath)
-                    this.testCases.push(testItem.label)
+                    this.parentPaths.push(info.filePath);
+                    this.testCases.push(testItem.label);
                 }
 
                 this.workspace.push(info.workspaceFolder!);
             });
         } else {
-            this.workspace.push(...workspace.workspaceFolders!)
+            this.workspace.push(...workspace.workspaceFolders!);
         }
 
         this.runCommand();
@@ -53,8 +53,8 @@ export default class TestCommandHandler {
 
         const windowsOS = process.platform === 'win32';
 
-        const finalCmdPrefix = windowsOS ? 'wsl' : cmdPrefix;
-        const finalArgs = windowsOS ? [cmdPrefix, ...args] : args;
+        const finalCmdPrefix = windowsOS && configs.isWslEnabled ? 'wsl' : cmdPrefix;
+        const finalArgs = windowsOS && configs.isWslEnabled ? [cmdPrefix, ...args] : args;
 
         this.workspace.forEach(workspaceFolder => {
             let currentWorkingDirectory = workspaceFolder.uri.path;
@@ -83,13 +83,13 @@ export default class TestCommandHandler {
                     } else if (matchExp.testStartedPattern) {
                         testOutputHandler.testStarted(matchExp.testStartedPattern, matchExp.testDatasetStartedPattern!);
                     } else if (matchExp.testFailedPattern) {
-                        testOutputHandler.testFailed(matchExp.testFailedPattern)
+                        testOutputHandler.testFailed(matchExp.testFailedPattern);
                     } else if (matchExp.testSkippedPattern) {
-                        testOutputHandler.testSkipped(matchExp.testSkippedPattern)
+                        testOutputHandler.testSkipped(matchExp.testSkippedPattern);
                     } else if (matchExp.testFinishedPattern) {
-                        testOutputHandler.testFinished(matchExp.testFinishedPattern)
+                        testOutputHandler.testFinished(matchExp.testFinishedPattern);
                     } else if (matchExp.testSuiteFinishedPattern) {
-                        testOutputHandler.suiteFinished(matchExp.testSuiteFinishedPattern)
+                        testOutputHandler.suiteFinished(matchExp.testSuiteFinishedPattern);
                     }
                 }
             });
@@ -107,7 +107,7 @@ export default class TestCommandHandler {
             command.stdout?.on('end', () => {
                 this.runner.end();
             });
-        })
+        });
     }
 
     private prepareCommand(): string[] {

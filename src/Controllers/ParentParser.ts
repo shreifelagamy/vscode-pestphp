@@ -29,13 +29,13 @@ export default class ParentParser {
     }
 
     async resolveTestParent(workspaceFolder: vscode.WorkspaceFolder, fileUrl?: string) {
-        let output
+        let output;
 
         const cmd = this.prepareCommand(fileUrl);
 
         const windowsOS = process.platform === 'win32';
 
-        let currentWorkingDirectory = workspaceFolder.uri.path
+        let currentWorkingDirectory = workspaceFolder.uri.path;
 
         if (windowsOS) {
             currentWorkingDirectory = workspaceFolder.uri.path
@@ -43,7 +43,7 @@ export default class ParentParser {
             .replace(/\//g, '\\'); // Replace forward slashes with backslashes
         }
 
-        const runningCommand = windowsOS ? `wsl ${cmd}` : `${cmd}`
+        const runningCommand = windowsOS && configs.isWslEnabled ? `wsl ${cmd}` : `${cmd}`;
 
         try {
             output = cp.execSync(runningCommand, { cwd: currentWorkingDirectory });
@@ -64,7 +64,7 @@ export default class ParentParser {
             if (!classNames.includes(theClassName)) {
                 const testPath = theClassName.replaceAll('\\', '/').replace('Tests/', 'tests/');
                 const fileUrl = `${testPath}.php`;
-                const uri = vscode.Uri.file(fileUrl)
+                const uri = vscode.Uri.file(fileUrl);
                 const ParentTestItem = this.controller.createTestItem(theClassName, theClassName, uri);
                 ParentTestItem.canResolveChildren = true;
 
@@ -75,7 +75,7 @@ export default class ParentParser {
                     testItem: ParentTestItem,
                     fileUrl: `${workspaceFolder.uri.path}/${testPath}.php`,
                     filePath: fileUrl
-                }
+                };
 
                 testData.set(ParentTestItem, info);
                 this.controller.items.add(ParentTestItem);
@@ -102,7 +102,7 @@ export default class ParentParser {
         watcher.onDidCreate(uri => {
             const workspaceFolder = vscode.workspace.getWorkspaceFolder(uri);
             if (workspaceFolder) {
-                const fileUrl = path.relative(workspaceFolder.uri.fsPath, uri.fsPath)
+                const fileUrl = path.relative(workspaceFolder.uri.fsPath, uri.fsPath);
                 this.resolveTestParent(workspaceFolder, fileUrl);
             }
         });
@@ -131,7 +131,7 @@ export default class ParentParser {
                     parentTestItem = item;
                     return; // Exit the loop once the item is found
                 }
-            })
+            });
 
             // If the parent test item is found
             if (parentTestItem) {
